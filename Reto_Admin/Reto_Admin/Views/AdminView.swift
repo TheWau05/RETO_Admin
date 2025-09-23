@@ -12,7 +12,7 @@ struct AdminView: View {
         ContentUnavailableView("Admin",
                                systemImage: "gearshape",
                                description: Text("Pantalla en blanco por ahora."))
-            .navigationTitle("Admin")
+            .navigationTitle("Admins")
     }
 }
 
