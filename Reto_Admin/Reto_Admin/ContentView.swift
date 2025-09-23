@@ -8,11 +8,20 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var admin = AdminManager()
+
     var body: some View {
-        VStack {
-            Text("Hello, world!")
+        TabView {
+            NavigationStack { DashboardAdminView() }
+                .tabItem { Label("Inicio", systemImage: "square.grid.2x2.fill") }
+
+            NavigationStack { HistorialAdminView() }
+                .tabItem { Label("Historia de Ventanilla", systemImage: "list.bullet.rectangle") }
+
+            NavigationStack { AdminView() }
+                .tabItem { Label("Admin", systemImage: "gearshape") }
         }
-        .padding()
+        .environmentObject(admin)
     }
 }
 
