@@ -16,7 +16,5 @@ struct AdminView: View {
     }
 }
 
-#Preview { NavigationStack {
-    AdminView()
-}
-}
+#Preview { NavigationStack { AdminView() } }
+
