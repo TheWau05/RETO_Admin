@@ -15,12 +15,16 @@ struct ContentView: View {
             NavigationStack { DashboardAdminView() }
                 .tabItem { Label("Inicio", systemImage: "square.grid.2x2.fill") }
 
+            NavigationStack { AbrirCerrarVentanillaPadView() }
+                .tabItem { Label("Abrir Cerrar", systemImage: "rectangle.portrait.on.rectangle.portrait") }
+
             NavigationStack { HistorialAdminView() }
-                .tabItem { Label("Historia de Ventanilla", systemImage: "list.bullet.rectangle") }
+                .tabItem { Label("Historial", systemImage: "list.bullet.rectangle") }
 
             NavigationStack { AdminView() }
                 .tabItem { Label("Admin", systemImage: "gearshape") }
         }
+        .tint(AdminColors.marca)
         .environmentObject(admin)
     }
 }

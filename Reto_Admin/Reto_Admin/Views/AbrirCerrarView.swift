@@ -36,6 +36,7 @@ struct AbrirCerrarVentanillaPadView: View {
                         }
                         .padding(.top, 4)
                     }
+                    .padding(.top, 40)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 20)
                 }
