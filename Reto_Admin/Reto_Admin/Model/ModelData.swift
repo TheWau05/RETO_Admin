@@ -1,11 +1,15 @@
 //
-//  HistorialAdmin.swift
-//  Reto_Admin
+//  ModelData.swift
+//  dsdasd
 //
-//  Created by Alumno on 22/09/25.
+//  Created by 박진혁 on 9/23/25.
 //
+
+
 import Foundation
 import SwiftUI
+
+
 
 struct Ventanilla: Identifiable, Hashable {
     let id = UUID()
@@ -41,6 +45,7 @@ func obtenerHistorial() -> [HistorialAdmin] {
 
 var historialDeVentanilla: [HistorialAdmin] = obtenerHistorial()
 
+
 final class AdminManager: ObservableObject {
     @Published var ventanillas: [Ventanilla] = [
         .init(nombre: "Ventanilla 1", abierta: true),
@@ -55,23 +60,58 @@ final class AdminManager: ObservableObject {
         guard let idx = ventanillas.firstIndex(of: v) else { return }
         ventanillas[idx].abierta.toggle()
         let accion = ventanillas[idx].abierta ? "Abierta" : "Cerrada"
-        historial.insert(.init(fecha: Date(), nombre: ventanillas[idx].nombre, accion: accion), at: 0)
+        historial.insert(.init(fecha: Date(),
+                               nombre: ventanillas[idx].nombre,
+                               accion: accion), at: 0)
     }
 
     func abrirTodas() {
         for i in ventanillas.indices where !ventanillas[i].abierta {
             ventanillas[i].abierta = true
-            historial.insert(.init(fecha: Date(), nombre: ventanillas[i].nombre, accion: "Abierta"), at: 0)
+            historial.insert(.init(fecha: Date(),
+                                   nombre: ventanillas[i].nombre,
+                                   accion: "Abierta"), at: 0)
         }
     }
 
     func cerrarTodas() {
         for i in ventanillas.indices where ventanillas[i].abierta {
             ventanillas[i].abierta = false
-            historial.insert(.init(fecha: Date(), nombre: ventanillas[i].nombre, accion: "Cerrada"), at: 0)
+            historial.insert(.init(fecha: Date(),
+                                   nombre: ventanillas[i].nombre,
+                                   accion: "Cerrada"), at: 0)
         }
     }
 
     var abiertasCount: Int { ventanillas.filter(\.abierta).count }
     var cerradasCount: Int { ventanillas.count - abiertasCount }
 }
+
+extension Color {
+    static var marca: Color { Color(red: 1/255, green: 104/255, blue: 138/255) }
+    static var acento: Color { Color(red: 255/255, green: 153/255, blue: 0/255) }
+    static var panel: Color { Color(red: 102/255, green: 102/255, blue: 102/255) }
+    static var tabGray: Color { Color(UIColor.systemGray5) }
+    static var headerGray: Color { Color(UIColor.systemGray5) }
+    static var textPrimary: Color { Color(UIColor.label) }
+}
+
+
+struct VentanillaCitas: Identifiable, Hashable {
+    let id = UUID()
+    var nombre: String
+    var citas: Int
+}
+
+final class CitasStore: ObservableObject {
+    @Published var items: [VentanillaCitas] = [
+        .init(nombre: "Ventanilla 1", citas: 12),
+        .init(nombre: "Ventanilla 2", citas: 8),
+        .init(nombre: "Ventanilla 3", citas: 16),
+        .init(nombre: "Ventanilla 4", citas: 5)
+    ]
+
+    var totalCitas: Int { items.reduce(0) { $0 + $1.citas } }
+    var maxPorVentanilla: Int { items.map(\.citas).max() ?? 0 }
+}
+
