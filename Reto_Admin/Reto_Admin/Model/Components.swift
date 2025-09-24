@@ -85,7 +85,7 @@ struct AdminActionCard: View {
 
 // Menú para elegir ventanilla 1..99
 struct VentanillaMenu: View {
-    var range: ClosedRange<Int> = 1...99
+    var range: ClosedRange<Int> = 1...4
     @Binding var value: Int
     var onChange: () -> Void
     var body: some View {
