@@ -8,10 +8,11 @@
 import SwiftUI
 
 struct DashboardAdminView: View {
+    @EnvironmentObject var router: AdminRouter
+
     var body: some View {
         ZStack {
             Color(.systemGray6).ignoresSafeArea()
-
             VStack(alignment: .leading, spacing: 24) {
                 HStack {
                     Text("Modo Administrador")
@@ -24,23 +25,35 @@ struct DashboardAdminView: View {
                 }
                 .padding(.top, 8)
 
-                AdminActionCard(
-                    title: "Abrir Cerrar ventanillas",
-                    systemImage: "rectangle.portrait.on.rectangle.portrait",
-                    color: AdminColors.marca
-                )
+                Button {
+                    router.switchTo(.abrirCerrar)
+                } label: {
+                    AdminActionCard(
+                        title: "Abrir Cerrar ventanillas",
+                        systemImage: "rectangle.portrait.on.rectangle.portrait",
+                        color: AdminColors.marca
+                    )
+                }
 
-                AdminActionCard(
-                    title: "Historial de ventanilla",
-                    systemImage: "clock.arrow.circlepath",
-                    color: AdminColors.marca
-                )
+                Button {
+                    router.switchTo(.historial)
+                } label: {
+                    AdminActionCard(
+                        title: "Historial de ventanilla",
+                        systemImage: "clock.arrow.circlepath",
+                        color: AdminColors.marca
+                    )
+                }
 
-                AdminActionCard(
-                    title: "Estadística de ventana",
-                    systemImage: "chart.bar.fill",
-                    color: AdminColors.marca
-                )
+                Button {
+                    router.switchTo(.estadistica)
+                } label: {
+                    AdminActionCard(
+                        title: "Estadística de ventana",
+                        systemImage: "chart.bar.fill",
+                        color: AdminColors.marca
+                    )
+                }
 
                 Spacer()
             }
@@ -49,5 +62,3 @@ struct DashboardAdminView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 }
-
-#Preview { NavigationStack { DashboardAdminView() } }

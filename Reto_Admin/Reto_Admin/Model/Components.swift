@@ -9,7 +9,6 @@ import SwiftUI
 import UIKit
 import Foundation
 
-// Paleta con namespace para evitar choques
 enum AdminColors {
     static let marca      = Color(red: 1/255,   green: 104/255, blue: 138/255)
     static let acento     = Color(red: 255/255, green: 153/255, blue: 0/255)
@@ -19,14 +18,12 @@ enum AdminColors {
     static let text       = Color(UIColor.label)
 }
 
-// Espaciados y radios
 struct AdminTheme {
     static let corner: CGFloat  = 20
     static let padding: CGFloat = 20
     static let spacing: CGFloat = 16
 }
 
-// Botón principal reutilizable
 struct PrimaryButton: View {
     var title: String
     var action: () -> Void
@@ -37,23 +34,21 @@ struct PrimaryButton: View {
                 .frame(maxWidth: 520)
                 .padding(.vertical, 18)
                 .background(RoundedRectangle(cornerRadius: AdminTheme.corner).fill(AdminColors.marca))
-                .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+                .foregroundStyle(Color.white)
+                .shadow(color: Color.black.opacity(0.12), radius: 8, y: 4)
         }
     }
 }
 
-// Título de sección
 struct SectionTitle: View {
     var text: String
     var body: some View {
         Text(text)
             .font(.system(size: 26, weight: .bold, design: .rounded))
-            .foregroundStyle(.black)
+            .foregroundStyle(Color.black)
     }
 }
 
-// Card de acción del dashboard
 struct AdminActionCard: View {
     var title: String
     var systemImage: String
@@ -66,24 +61,23 @@ struct AdminActionCard: View {
                     .frame(width: 48, height: 48)
                 Image(systemName: systemImage)
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.white)
             }
             Text(title)
                 .font(.headline)
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.white)
             Spacer()
             Image(systemName: "chevron.right")
                 .font(.headline)
-                .foregroundStyle(.white.opacity(0.9))
+                .foregroundStyle(Color.white.opacity(0.9))
         }
         .padding(.vertical, 18)
         .padding(.horizontal, 18)
         .background(RoundedRectangle(cornerRadius: 20).fill(color))
-        .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
+        .shadow(color: Color.black.opacity(0.08), radius: 8, y: 4)
     }
 }
 
-// Menú para elegir ventanilla 1..4
 struct VentanillaMenu: View {
     var range: ClosedRange<Int> = 1...4
     @Binding var value: Int
@@ -98,17 +92,16 @@ struct VentanillaMenu: View {
                 Text("\(value)")
                     .font(.system(size: 68, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Color.black)
                 Image(systemName: "chevron.down")
                     .font(.title2)
-                    .foregroundStyle(.gray)
+                    .foregroundStyle(Color.gray)
                     .padding(.top, 6)
             }
         }
     }
 }
 
-// Grid de horas reutilizable
 struct HourGrid: View {
     let hours: [String]
     @Binding var selected: String?
@@ -133,7 +126,7 @@ struct HourGrid: View {
                             .foregroundStyle(selected == h ? Color.white : Color.gray)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 14)
-                                    .stroke(selected == h ? .clear : Color.gray.opacity(0.25), lineWidth: 1)
+                                    .stroke(selected == h ? Color.clear : Color.gray.opacity(0.25), lineWidth: 1)
                             )
                     }
                     .buttonStyle(.plain)
@@ -144,7 +137,6 @@ struct HourGrid: View {
     }
 }
 
-// Estilo de barra de navegación gris
 struct NavBarConfigurator: UIViewControllerRepresentable {
     var background: UIColor
     var title: UIColor
@@ -169,5 +161,23 @@ extension View {
             background: UIColor(AdminColors.headerGray),
             title: UIColor(AdminColors.text)
         ))
+    }
+}
+
+struct StatCard: View {
+    let title: String
+    let value: Int
+    let color: Color
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(.caption).foregroundColor(.secondary)
+            Text("\(value)").font(.title.bold())
+            ProgressView(value: value > 0 ? 1.0 : 0.0).tint(color)
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color(.systemBackground)))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(.separator), lineWidth: 0.5))
+        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
     }
 }

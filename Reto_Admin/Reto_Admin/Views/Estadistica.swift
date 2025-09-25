@@ -2,108 +2,84 @@ import SwiftUI
 import Charts
 
 struct EstadisticaVentanillaView: View {
-    @EnvironmentObject var store: CitasStore
-    
-    private var currentDate: Date {
-        Date()
-    }
-    private var currentHour: Int {
-        Calendar.current.component(.hour, from: Date())
-    }
-    
-    private var orderedHours: [Int] {
-        let now = Calendar.current.component(.hour, from: Date())
-        return (0..<24).map { (now + $0) % 24 }
-    }
+    @StateObject private var vm: EstadisticaViewModel
 
-    struct BarDatum: Identifiable {
-        let id = UUID(); let label: String; let value: Int
+    init(api: AdminAPI) {
+        _vm = StateObject(wrappedValue: EstadisticaViewModel(api: api))
     }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Resumen (basado en citas)
-                HStack(spacing: 12) {
-                    StatCard(title: "Turnos Proximos",
-                             value: 15,
-                             color: .green)
-                    
-                    StatCard(title: "Ventanillas Abiertas",
-                             value: 12,
-                             color: .orange)
-                }
-                
-                VStack(spacing: 10) {
+                if vm.loading {
+                    ProgressView().padding()
+                } else if let err = vm.errorText {
+                    Text(err).foregroundStyle(Color.red)
+                } else {
                     HStack(spacing: 12) {
-                        StatCard(title: "duracion servicio por promedio",
+                        StatCard(title: "Turnos Proximos",
+                                 value: totalFuture(),
+                                 color: Color.green)
+
+                        StatCard(title: "Ventanillas Abiertas",
                                  value: 12,
-                                 color: .blue)
-                        
-                        StatCard(title: "Duracion espara promedio",
-                                 value: 12,
-                                 color: .black)
+                                 color: Color.orange)
                     }
+
+                    HStack(spacing: 12) {
+                        StatCard(title: "Duracion servicio promedio",
+                                 value: avg(vm.averages.map { $0.avgServiceMinutes }),
+                                 color: Color.blue)
+
+                        StatCard(title: "Espera promedio",
+                                 value: avg(vm.averages.map { $0.avgWaitMinutes }),
+                                 color: Color.black)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Tiempo de espera y duración por hora")
+                        Chart {
+                            ForEach(vm.averages) { row in
+                                BarMark(x: .value("Hora", row.hourStart, unit: .hour),
+                                        y: .value("Min", row.avgServiceMinutes))
+                                    .foregroundStyle(Color.blue)
+                                BarMark(x: .value("Hora", row.hourStart, unit: .hour),
+                                        y: .value("Min", row.avgWaitMinutes))
+                                    .foregroundStyle(Color.orange)
+                            }
+                        }
+                        .frame(height: 220)
+                    }
+                    .padding(.horizontal)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Turnos 24h pasado y futuro")
+                        Chart {
+                            ForEach(vm.comparison) { item in
+                                LineMark(x: .value("Hora", item.hourStart, unit: .hour),
+                                         y: .value("Turnos", item.turnosCount))
+                                .foregroundStyle(item.period == "Past" ? Color.gray : Color.green)
+                            }
+                        }
+                        .frame(height: 220)
+                    }
+                    .padding(.horizontal)
                 }
             }
-            .padding()
-            
-            // --- Remaining Charts ---
-            Text("Tiempo de Espera y Duración de Turno (past)")
-            Chart {
-                ForEach(orderedHours, id: \.self) { hour in
-                    BarMark(
-                        x: .value("Hour", String(hour)),
-                        y: .value("Value", Double.random(in: 0...10))
-                    )
-                }
-            }
-            .chartXAxis {
-                AxisMarks(values: orderedHours.map { String($0) })
-            }
-            .frame(height: 200)
-            .padding()
-            
-            Text("Turnos 24h past and future")
-            Chart {
-                ForEach(orderedHours, id: \.self) { hour in
-                    BarMark(
-                        x: .value("Hour", String(hour)),
-                        y: .value("Value", Double.random(in: 0...10))
-                    )
-                }
-            }
-            .chartXAxis {
-                AxisMarks(values: orderedHours.map { String($0) })
-            }
-            .frame(height: 200)
             .padding()
         }
         .navigationTitle("Estadística")
+        .task { await vm.load() }
     }
-}
 
-
-struct StatCard: View {
-    let title: String
-    let value: Int
-    let color: Color
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.caption).foregroundColor(.secondary)
-            Text("\(value)").font(.title.bold())
-            ProgressView(value: value > 0 ? 1.0 : 0.0) // decorativo
-                .tint(color)
-        }
-        .padding()
-        .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color(.systemBackground)))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(.separator), lineWidth: 0.5))
-        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+    private func totalFuture() -> Int {
+        vm.comparison
+            .filter { $0.period == "Future" }
+            .reduce(0) { $0 + $1.turnosCount }
     }
-}
 
-#Preview {
-    NavigationStack { EstadisticaVentanillaView() }
-        .environmentObject(CitasStore())
+    private func avg(_ xs: [Double]) -> Int {
+        guard !xs.isEmpty else { return 0 }
+        return Int(xs.reduce(0, +) / Double(xs.count))
+    }
 }

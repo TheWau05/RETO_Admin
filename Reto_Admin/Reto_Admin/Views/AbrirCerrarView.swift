@@ -8,10 +8,13 @@
 import SwiftUI
 
 struct AbrirCerrarVentanillaPadView: View {
+    let api: AdminAPI
     @State private var ventanilla = 1
     @State private var cerrada = true
     @State private var horaSeleccionada: String? = nil
     @State private var estados: [Int: [String: Bool]] = [:]
+    @State private var sending = false
+    @State private var errorText: String?
 
     private let horas: [String] = {
         var r: [String] = []
@@ -30,11 +33,11 @@ struct AbrirCerrarVentanillaPadView: View {
                     VStack(spacing: AdminTheme.spacing) {
                         encabezado
                         selectorHoras(cardWidth: cardWidth, columnas: cols)
-                        PrimaryButton(title: cerrada ? "Abrir ventanilla" : "Cerrar ventanilla") {
-                            cerrada.toggle()
-                            guardarEstadoActual()
+                        PrimaryButton(title: sending ? "Procesando..." : (cerrada ? "Abrir ventanilla" : "Cerrar ventanilla")) {
+                            Task { await enviarEstado() }
                         }
-                        .padding(.top, 4)
+                        .disabled(horaSeleccionada == nil || sending)
+                        if let e = errorText { Text(e).foregroundStyle(Color.red) }
                     }
                     .padding(.top, 40)
                     .padding(.horizontal, 20)
@@ -52,7 +55,7 @@ struct AbrirCerrarVentanillaPadView: View {
         VStack(spacing: 14) {
             Text("Ventanilla")
                 .font(.system(size: 40, weight: .heavy, design: .rounded))
-                .foregroundStyle(.black)
+                .foregroundStyle(Color.black)
 
             HStack(spacing: 22) {
                 VentanillaMenu(value: $ventanilla) { syncEstadoConSeleccion() }
@@ -66,7 +69,7 @@ struct AbrirCerrarVentanillaPadView: View {
                 ) {
                     Text(cerrada ? "Cerrada" : "Abierta")
                         .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(Color.black)
                 }
                 .toggleStyle(.switch)
                 .tint(AdminColors.marca)
@@ -78,9 +81,7 @@ struct AbrirCerrarVentanillaPadView: View {
     @ViewBuilder
     private func selectorHoras(cardWidth: CGFloat, columnas: [GridItem]) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            SectionTitle(text: "Escoge hora de apertura")
-                .padding(.horizontal, 6)
-
+            SectionTitle(text: "Escoge hora de apertura").padding(.horizontal, 6)
             HourGrid(hours: horas, selected: $horaSeleccionada, columns: columnas) { _ in
                 syncEstadoConSeleccion()
             }
@@ -94,7 +95,6 @@ struct AbrirCerrarVentanillaPadView: View {
         return Array(repeating: GridItem(.flexible(), spacing: 16), count: count)
     }
 
-    // Persistencia en memoria para estado por ventanilla y hora
     private func estadoDe(vent: Int, hora: String) -> Bool {
         estados[vent]?[hora] ?? true
     }
@@ -114,8 +114,22 @@ struct AbrirCerrarVentanillaPadView: View {
         guard let h = horaSeleccionada else { return }
         cerrada = estadoDe(vent: ventanilla, hora: h)
     }
-}
 
-#Preview {
-    AbrirCerrarVentanillaPadView()
+    private func enviarEstado() async {
+        guard let h = horaSeleccionada else { return }
+        sending = true
+        errorText = nil
+        let comps = h.split(separator: ":")
+        let hour = Int(comps[0]) ?? 0
+        let minute = Int(comps[1]) ?? 0
+        var base = Calendar.current.startOfDay(for: Date())
+        base = Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: base) ?? Date()
+        do {
+            try await api.setVentanillaState(ventanillaId: ventanilla, hourStart: base, closed: cerrada)
+            guardarEstadoActual()
+        } catch {
+            errorText = "No se pudo enviar"
+        }
+        sending = false
+    }
 }
