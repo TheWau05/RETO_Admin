@@ -7,37 +7,23 @@
 
 import Foundation
 
+extension EmployeeBasic {
+    init(id: Int, name: String) { self.id = id; self.name = name }
+}
+
 final class MockAdminAPI: AdminAPI {
-    func turnos24hAverages() async throws -> [TurnoAverageHour] {
-        let now = Date()
-        return (0..<24).map { i in
-            let h = Calendar.current.date(byAdding: .hour, value: i, to: now)!
-            return TurnoAverageHour(hourStart: h, avgServiceMinutes: Double(Int.random(in: 8...15)), avgWaitMinutes: Double(Int.random(in: 8...15)))
-        }
-    }
+    // Ventanillas
+    func openVentanilla(ventanillaId: Int, empId: Int) async throws { }
+    func closeVentanilla(ventanillaId: Int) async throws { }
 
-    func turnos24hComparison() async throws -> [TurnosComparisonItem] {
-        let now = Date()
-        let past = (0..<24).map { i in
-            TurnosComparisonItem(period: "Past", hourStart: Calendar.current.date(byAdding: .hour, value: -i, to: now)!, turnosCount: Int.random(in: 0...12))
-        }
-        let future = (1...24).map { i in
-            TurnosComparisonItem(period: "Future", hourStart: Calendar.current.date(byAdding: .hour, value: i, to: now)!, turnosCount: Int.random(in: 0...12))
-        }
-        return past + future
+    // Empleados
+    func unassignedEmployees() async throws -> [EmployeeBasic] {
+        [
+            .init(id: 1, name: "Ana López"),
+            .init(id: 2, name: "Bruno Díaz"),
+            .init(id: 3, name: "Carla Ruiz"),
+            .init(id: 4, name: "Diego Pérez"),
+            .init(id: 5, name: "Eva García")
+        ]
     }
-
-    func aheadCount(turnoId: Int) async throws -> AheadCount {
-        AheadCount(aheadCount: Int.random(in: 0...10))
-    }
-
-    func avgTimesByEmployee() async throws -> [EmployeeAvg] {
-        (1...6).map { i in EmployeeAvg(empId: i, avgServiceMinutes: Double.random(in: 9...14), avgWaitMinutes: Double.random(in: 9...14)) }
-    }
-
-    func avgTimesByVentanilla() async throws -> [VentanillaAvg] {
-        (1...4).map { i in VentanillaAvg(ventanillaId: i, avgServiceMinutes: Double.random(in: 9...14), avgWaitMinutes: Double.random(in: 9...14)) }
-    }
-
-    func setVentanillaState(ventanillaId: Int, hourStart: Date, closed: Bool) async throws {}
 }

@@ -9,7 +9,6 @@ import SwiftUI
 
 struct DashboardAdminView: View {
     @EnvironmentObject var router: AdminRouter
-    @EnvironmentObject var apiContainer: APIContainer
 
     var body: some View {
         ZStack {
@@ -39,18 +38,22 @@ struct DashboardAdminView: View {
                                         color: AdminColors.marca)
                     }
 
-                    // Spreadsheets centradas
-                    HStack { Spacer()
-                        TablesBlock(api: apiContainer.client)
+                    HStack {
+                        Spacer()
+                        // Visual-only (sin API)
+                        TablesBlock()
                             .frame(maxWidth: 980)
                         Spacer()
                     }
-
-                    Spacer(minLength: 8)
                 }
                 .padding(.horizontal, 20)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
     }
+}
+
+#Preview {
+    DashboardAdminView()
+        .environmentObject(AdminRouter())
 }

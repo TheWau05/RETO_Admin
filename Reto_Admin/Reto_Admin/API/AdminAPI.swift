@@ -7,66 +7,126 @@
 
 import Foundation
 
+// MARK: - Contrato
 protocol AdminAPI {
-    func turnos24hAverages() async throws -> [TurnoAverageHour]
-    func turnos24hComparison() async throws -> [TurnosComparisonItem]
-    func aheadCount(turnoId: Int) async throws -> AheadCount
+    // Stats / tablas (NO usados por Abrir/Cerrar; dejar para que compile el resto)
     func avgTimesByEmployee() async throws -> [EmployeeAvg]
     func avgTimesByVentanilla() async throws -> [VentanillaAvg]
+    func turnos24hAverages() async throws -> [TurnoAverageHour]
+    func turnos24hComparison() async throws -> [TurnosComparisonItem]
+    func turnos24hBins() async throws -> [TurnoHourBin]
+
+    // Turnos (NO usados por Abrir/Cerrar)
+    func aheadCount(turnoId: Int) async throws -> AheadCount
+    func getNextTurno() async throws -> NextTurno
+    func userTurns(userId: Int) async throws -> [UserTurn]
+
+    // Ventanillas / Servicio (SÍ usamos open/close)
+    func openVentanilla(ventanillaId: Int, empId: Int) async throws
+    func closeVentanilla(ventanillaId: Int) async throws
+    func serviceVentanilla(ventanillaId: Int, empId: Int) async throws
+    func startService(ventanillaId: Int, turnoId: Int) async throws
+
+    // Compat de UI antigua (lo dejo pero con default que llama open/close)
     func setVentanillaState(ventanillaId: Int, hourStart: Date, closed: Bool) async throws
+
+    // Empleados (SÍ usamos)
+    func unassignedEmployees() async throws -> [EmployeeBasic]
 }
 
-enum APIError: Error { case badURL, requestFailed, decodingFailed }
+enum APIError: Error {
+    case badURL
+    case requestFailed(Int)
+    case decodingFailed
+    case unimplemented
+}
 
+// MARK: - Defaults para TODO lo que no usa Abrir/Cerrar
+extension AdminAPI {
+    func avgTimesByEmployee() async throws -> [EmployeeAvg] { throw APIError.unimplemented }
+    func avgTimesByVentanilla() async throws -> [VentanillaAvg] { throw APIError.unimplemented }
+    func turnos24hAverages() async throws -> [TurnoAverageHour] { throw APIError.unimplemented }
+    func turnos24hComparison() async throws -> [TurnosComparisonItem] { throw APIError.unimplemented }
+    func turnos24hBins() async throws -> [TurnoHourBin] { throw APIError.unimplemented }
+
+    func aheadCount(turnoId: Int) async throws -> AheadCount { throw APIError.unimplemented }
+    func getNextTurno() async throws -> NextTurno { throw APIError.unimplemented }
+    func userTurns(userId: Int) async throws -> [UserTurn] { throw APIError.unimplemented }
+
+    func serviceVentanilla(ventanillaId: Int, empId: Int) async throws { throw APIError.unimplemented }
+    func startService(ventanillaId: Int, turnoId: Int) async throws { throw APIError.unimplemented }
+
+    // Default útil: si alguien aún llama esto, lo mapeo a open/close con empId=1
+    func setVentanillaState(ventanillaId: Int, hourStart: Date, closed: Bool) async throws {
+        if closed { try await closeVentanilla(ventanillaId: ventanillaId) }
+        else { try await openVentanilla(ventanillaId: ventanillaId, empId: 1) }
+    }
+
+    // Si nadie lo implementa: por claridad fallar explícito
+    func unassignedEmployees() async throws -> [EmployeeBasic] { throw APIError.unimplemented }
+}
+
+// MARK: - Cliente HTTP SOLO Abrir/Cerrar
 final class HTTPAdminAPI: AdminAPI {
+    struct Paths {
+        let prefix = "" // cambia a "/api" si tu Flask tiene prefijo
+        func open(_ v: Int, _ e: Int) -> String { "\(prefix)/ventanillas/open/\(v)/\(e)" }
+        func close(_ v: Int)             -> String { "\(prefix)/ventanillas/close/\(v)" }
+        var unassigned: String           { "\(prefix)/employees/unassigned" }
+    }
+
     let baseURL: URL
     let session: URLSession
+    private let paths = Paths()
+
     init(baseURL: URL, session: URLSession = .shared) {
-        self.baseURL = baseURL; self.session = session
+        self.baseURL = baseURL
+        self.session = session
     }
 
-    func turnos24hAverages() async throws -> [TurnoAverageHour] { try await get(path: "/sp_turnos24hAverages") }
-    func turnos24hComparison() async throws -> [TurnosComparisonItem] { try await get(path: "/sp_turnos24hComparison") }
-    func aheadCount(turnoId: Int) async throws -> AheadCount { try await get(path: "/sp_turnosAhead", query: ["turnoId": "\(turnoId)"]) }
-    func avgTimesByEmployee() async throws -> [EmployeeAvg] { try await get(path: "/sp_avgTimesByEmployee") }
-    func avgTimesByVentanilla() async throws -> [VentanillaAvg] { try await get(path: "/sp_avgTimesByVentanilla") }
-
-    func setVentanillaState(ventanillaId: Int, hourStart: Date, closed: Bool) async throws {
-        struct Body: Encodable { let ventanillaId: Int; let hourStart: String; let closed: Bool }
-        let body = Body(ventanillaId: ventanillaId, hourStart: hourStart.iso8601, closed: closed)
-        _ = try await post(path: "/ventanilla/state", body: body) as EmptyResponse
+    // Empleados
+    func unassignedEmployees() async throws -> [EmployeeBasic] {
+        try await getWrapped(paths.unassigned)
     }
 
-    private struct EmptyResponse: Decodable {}
-
-    private func get<T: Decodable>(path: String, query: [String:String] = [:]) async throws -> T {
-        guard var comps = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false) else { throw APIError.badURL }
-        if !query.isEmpty { comps.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) } }
-        guard let url = comps.url else { throw APIError.badURL }
-        let (data, resp) = try await session.data(from: url)
-        guard let http = resp as? HTTPURLResponse, 200..<300 ~= http.statusCode else { throw APIError.requestFailed }
-        do { return try JSONDecoder.api.decode(T.self, from: data) } catch { throw APIError.decodingFailed }
+    // Ventanillas
+    func openVentanilla(ventanillaId: Int, empId: Int) async throws {
+        try await postVoid(paths.open(ventanillaId, empId))
+    }
+    func closeVentanilla(ventanillaId: Int) async throws {
+        try await postVoid(paths.close(ventanillaId))
     }
 
-    private func post<T: Encodable, R: Decodable>(path: String, body: T) async throws -> R {
+    // Infra mínima
+    private struct EmptyBody: Encodable {}
+    private func decodeWrapped<T: Decodable>(_ data: Data) throws -> T {
+        let dec = JSONDecoder.api
+        if let t = try? dec.decode(T.self, from: data) { return t }
+        if let env = try? dec.decode(ProcedureEnvelope<T>.self, from: data) {
+            if let d = env.data { return d }
+            if let o = env.output { return o }
+        }
+        throw APIError.decodingFailed
+    }
+    private func getWrapped<T: Decodable>(_ path: String) async throws -> T {
+        let url = baseURL.appendingPathComponent(path)
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.addValue("application/json", forHTTPHeaderField: "Accept")
+        let (data, resp) = try await session.data(for: req)
+        guard let http = resp as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
+            throw APIError.requestFailed((resp as? HTTPURLResponse)?.statusCode ?? -1)
+        }
+        return try decodeWrapped(data)
+    }
+    private func postVoid(_ path: String) async throws {
         var req = URLRequest(url: baseURL.appendingPathComponent(path))
         req.httpMethod = "POST"
         req.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = try JSONEncoder().encode(body)
-        let (data, resp) = try await session.data(for: req)
-        guard let http = resp as? HTTPURLResponse, 200..<300 ~= http.statusCode else { throw APIError.requestFailed }
-        do { return try JSONDecoder.api.decode(R.self, from: data) } catch { throw APIError.decodingFailed }
+        req.httpBody = try JSONEncoder().encode(EmptyBody())
+        let (_, resp) = try await session.data(for: req)
+        guard let http = resp as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
+            throw APIError.requestFailed((resp as? HTTPURLResponse)?.statusCode ?? -1)
+        }
     }
 }
-
-    func turnos24hComparison() async throws -> [TurnosComparisonItem] {
-        let now = Date()
-        let past = (0..<24).map { i in TurnosComparisonItem(period: "Past",   hourStart: Calendar.current.date(byAdding: .hour, value: -i, to: now)!, turnosCount: Int.random(in: 0...12)) }
-        let future = (1...24).map { i in TurnosComparisonItem(period: "Future", hourStart: Calendar.current.date(byAdding: .hour, value:  i, to: now)!, turnosCount: Int.random(in: 0...12)) }
-        return past + future
-    }
-    func aheadCount(turnoId: Int) async throws -> AheadCount { AheadCount(aheadCount: Int.random(in: 0...10)) }
-    func avgTimesByEmployee() async throws -> [EmployeeAvg] { (1...6).map { EmployeeAvg(empId: $0, avgServiceMinutes: Double.random(in: 9...14), avgWaitMinutes: Double.random(in: 9...14)) } }
-    func avgTimesByVentanilla() async throws -> [VentanillaAvg] { (1...4).map { VentanillaAvg(ventanillaId: $0, avgServiceMinutes: Double.random(in: 9...14), avgWaitMinutes: Double.random(in: 9...14)) } }
-    func setVentanillaState(ventanillaId: Int, hourStart: Date, closed: Bool) async throws {}
-
