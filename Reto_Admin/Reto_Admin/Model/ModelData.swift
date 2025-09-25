@@ -9,8 +9,6 @@
 import Foundation
 import SwiftUI
 
-
-
 struct Ventanilla: Identifiable, Hashable {
     let id = UUID()
     var nombre: String
@@ -87,8 +85,7 @@ final class AdminManager: ObservableObject {
     var cerradasCount: Int { ventanillas.count - abiertasCount }
 }
 
-<<<<<<< HEAD:Reto_Admin/Reto_Admin/Model/HistorialAdmin.swift
-=======
+
 extension Color {
     static var marca: Color { Color(red: 1/255, green: 104/255, blue: 138/255) }
     static var acento: Color { Color(red: 255/255, green: 153/255, blue: 0/255) }
@@ -97,8 +94,6 @@ extension Color {
     static var headerGray: Color { Color(UIColor.systemGray5) }
     static var textPrimary: Color { Color(UIColor.label) }
 }
-
->>>>>>> 6a8066c9ba667a236937fc14a7efd0e3c828a270:Reto_Admin/Reto_Admin/Model/ModelData.swift
 
 struct VentanillaCitas: Identifiable, Hashable {
     let id = UUID()
@@ -117,7 +112,3 @@ final class CitasStore: ObservableObject {
     var totalCitas: Int { items.reduce(0) { $0 + $1.citas } }
     var maxPorVentanilla: Int { items.map(\.citas).max() ?? 0 }
 }
-<<<<<<< HEAD:Reto_Admin/Reto_Admin/Model/HistorialAdmin.swift
-=======
-
->>>>>>> 6a8066c9ba667a236937fc14a7efd0e3c828a270:Reto_Admin/Reto_Admin/Model/ModelData.swift

@@ -1,26 +1,8 @@
-//
-<<<<<<< HEAD
-//  AdminView.swift
-//  Reto_Admin
-//
-//  Created by 박진혁 on 9/23/25.
-=======
-//  Estadistica.swift
-//  Reto_Admin
-//
-//  Created by ediaz205  on 9/24/25.
->>>>>>> 6a8066c9ba667a236937fc14a7efd0e3c828a270
-//
-
 import SwiftUI
 import Charts
 
 struct EstadisticaVentanillaView: View {
     @EnvironmentObject var store: CitasStore
-<<<<<<< HEAD
-
-    struct BarDatum: Identifiable { let id = UUID(); let label: String; let value: Int }
-=======
     
     private var currentDate: Date {
         Date()
@@ -37,56 +19,29 @@ struct EstadisticaVentanillaView: View {
     struct BarDatum: Identifiable {
         let id = UUID(); let label: String; let value: Int
     }
->>>>>>> 6a8066c9ba667a236937fc14a7efd0e3c828a270
 
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
                 // Resumen (basado en citas)
                 HStack(spacing: 12) {
-<<<<<<< HEAD
-                    StatCard(title: "Total de citas",
-                             value: store.totalCitas,
-                             color: .green)
-
-                    StatCard(title: "Máx. por ventanilla",
-                             value: store.maxPorVentanilla,
-                             color: .orange)
-                }
-
-                // Gráfico (citas por ventanilla)
-                let data = store.items.map { BarDatum(label: $0.nombre, value: $0.citas) }
-
-                GroupBox("Estado actual") {
-                    Chart(data) { d in
-                        BarMark(
-                            x: .value("Ventanilla", d.label),
-                            y: .value("Citas", d.value)
-                        )
-                        .foregroundStyle(Color.accentColor)
-                    }
-                    .frame(height: 220)
-                }
-            }
-            .padding()
-=======
                     StatCard(title: "Turnos Proximos",
                              value: 15,
                              color: .green)
                     
                     StatCard(title: "Ventanillas Abiertas",
-                             value: store.maxPorVentanilla,
+                             value: 12,
                              color: .orange)
                 }
                 
                 VStack(spacing: 10) {
                     HStack(spacing: 12) {
                         StatCard(title: "duracion servicio por promedio",
-                                 value: store.maxPorVentanilla,
+                                 value: 12,
                                  color: .blue)
                         
                         StatCard(title: "Duracion espara promedio",
-                                 value: store.maxPorVentanilla,
+                                 value: 12,
                                  color: .black)
                     }
                 }
@@ -123,17 +78,12 @@ struct EstadisticaVentanillaView: View {
             }
             .frame(height: 200)
             .padding()
->>>>>>> 6a8066c9ba667a236937fc14a7efd0e3c828a270
         }
         .navigationTitle("Estadística")
     }
 }
 
-<<<<<<< HEAD
-// Tarjeta simple reutilizable
-=======
 
->>>>>>> 6a8066c9ba667a236937fc14a7efd0e3c828a270
 struct StatCard: View {
     let title: String
     let value: Int
