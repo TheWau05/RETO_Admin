@@ -59,5 +59,3 @@ struct HistorialAdminView: View {
         historialFiltrado = v.filter { Calendar.current.isDate($0.horaAtencion, inSameDayAs: fechaSeleccionada) }
     }
 }
-
-#Preview { HistorialAdminView() }

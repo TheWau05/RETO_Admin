@@ -33,11 +33,17 @@ struct AbrirCerrarVentanillaPadView: View {
                     VStack(spacing: AdminTheme.spacing) {
                         encabezado
                         selectorHoras(cardWidth: cardWidth, columnas: cols)
-                        PrimaryButton(title: sending ? "Procesando..." : (cerrada ? "Abrir ventanilla" : "Cerrar ventanilla")) {
-                            Task { await enviarEstado() }
+
+                        PrimaryButton(
+                            title: sending ? "Procesando..." : (cerrada ? "Abrir ventanilla" : "Cerrar ventanilla")
+                        ) {
+                            Task { await onPrimaryButtonTap() }
                         }
                         .disabled(horaSeleccionada == nil || sending)
-                        if let e = errorText { Text(e).foregroundStyle(Color.red) }
+
+                        if let e = errorText {
+                            Text(e).foregroundStyle(Color.red)
+                        }
                     }
                     .padding(.top, 40)
                     .padding(.horizontal, 20)
@@ -115,21 +121,40 @@ struct AbrirCerrarVentanillaPadView: View {
         cerrada = estadoDe(vent: ventanilla, hora: h)
     }
 
-    private func enviarEstado() async {
-        guard let h = horaSeleccionada else { return }
+    // MARK: - Actions
+    private func onPrimaryButtonTap() async {
+        guard let _ = horaSeleccionada else {
+            errorText = "Selecciona una hora primero."
+            return
+        }
+
+        // 1) Optimistic UI: alternamos el estado local inmediatamente
+        let newClosed = !cerrada
+        let previous = cerrada
+        cerrada = newClosed
         sending = true
         errorText = nil
+
+        do {
+            try await enviarEstado(newClosed)
+            guardarEstadoActual() // persistimos en el diccionario local
+        } catch {
+            // 2) Revertimos si falla
+            cerrada = previous
+            errorText = "No se pudo enviar. Intenta de nuevo."
+        }
+
+        sending = false
+    }
+
+    /// Envía al API el estado indicado (true = cerrada, false = abierta)
+    private func enviarEstado(_ closed: Bool) async throws {
+        guard let h = horaSeleccionada else { return }
         let comps = h.split(separator: ":")
         let hour = Int(comps[0]) ?? 0
         let minute = Int(comps[1]) ?? 0
         var base = Calendar.current.startOfDay(for: Date())
         base = Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: base) ?? Date()
-        do {
-            try await api.setVentanillaState(ventanillaId: ventanilla, hourStart: base, closed: cerrada)
-            guardarEstadoActual()
-        } catch {
-            errorText = "No se pudo enviar"
-        }
-        sending = false
+        try await api.setVentanillaState(ventanillaId: ventanilla, hourStart: base, closed: closed)
     }
 }
