@@ -70,7 +70,6 @@ extension DateFormatter {
         return f
     }()
 }
-
 extension JSONDecoder {
     static let api: JSONDecoder = {
         let d = JSONDecoder()
@@ -78,7 +77,4 @@ extension JSONDecoder {
         return d
     }()
 }
-
-extension Date {
-    var iso8601: String { DateFormatter.apiISO8601.string(from: self) }
-}
+extension Date { var iso8601: String { DateFormatter.apiISO8601.string(from: self) } }

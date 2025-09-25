@@ -9,55 +9,51 @@ import SwiftUI
 
 struct DashboardAdminView: View {
     @EnvironmentObject var router: AdminRouter
+    @EnvironmentObject var apiContainer: APIContainer
 
     var body: some View {
         ZStack {
             Color(.systemGray6).ignoresSafeArea()
-            VStack(alignment: .leading, spacing: 24) {
-                HStack {
-                    Text("Modo Administrador")
-                        .font(.largeTitle.bold())
-                        .foregroundColor(AdminColors.text)
-                    Spacer()
-                    Image(systemName: "person.circle.fill")
-                        .font(.system(size: 34))
-                        .foregroundColor(AdminColors.acento)
-                }
-                .padding(.top, 8)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    HStack {
+                        Text("Modo Administrador")
+                            .font(.largeTitle.bold())
+                            .foregroundColor(AdminColors.text)
+                        Spacer()
+                        Image(systemName: "person.circle.fill")
+                            .font(.system(size: 34))
+                            .foregroundColor(AdminColors.acento)
+                    }
+                    .padding(.top, 8)
 
-                Button {
-                    router.switchTo(.abrirCerrar)
-                } label: {
-                    AdminActionCard(
-                        title: "Abrir Cerrar ventanillas",
-                        systemImage: "rectangle.portrait.on.rectangle.portrait",
-                        color: AdminColors.marca
-                    )
-                }
+                    Button { router.switchTo(.abrirCerrar) } label: {
+                        AdminActionCard(title: "Abrir Cerrar ventanillas",
+                                        systemImage: "rectangle.portrait.on.rectangle.portrait",
+                                        color: AdminColors.marca)
+                    }
+                    Button { router.switchTo(.historial) } label: {
+                        AdminActionCard(title: "Historial de ventanilla",
+                                        systemImage: "clock.arrow.circlepath",
+                                        color: AdminColors.marca)
+                    }
+                    Button { router.switchTo(.estadistica) } label: {
+                        AdminActionCard(title: "Estadística de ventana",
+                                        systemImage: "chart.bar.fill",
+                                        color: AdminColors.marca)
+                    }
 
-                Button {
-                    router.switchTo(.historial)
-                } label: {
-                    AdminActionCard(
-                        title: "Historial de ventanilla",
-                        systemImage: "clock.arrow.circlepath",
-                        color: AdminColors.marca
-                    )
-                }
+                    HStack {
+                        Spacer()
+                        TablesBlock(api: apiContainer.client)
+                            .frame(maxWidth: 980)
+                        Spacer()
+                    }
 
-                Button {
-                    router.switchTo(.estadistica)
-                } label: {
-                    AdminActionCard(
-                        title: "Estadística de ventana",
-                        systemImage: "chart.bar.fill",
-                        color: AdminColors.marca
-                    )
+                    Spacer(minLength: 8)
                 }
-
-                Spacer()
+                .padding(.horizontal, 20)
             }
-            .padding(.horizontal, 20)
         }
         .navigationBarTitleDisplayMode(.inline)
     }

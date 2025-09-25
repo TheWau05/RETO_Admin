@@ -7,35 +7,34 @@
 
 import SwiftUI
 
-enum AdminTab: Hashable {
-    case dashboard
-    case abrirCerrar
-    case historial
-    case estadistica
-}
-
-// Rutas internas por si luego navegas a detalles
-enum AdminRoute: Hashable {
-    case detalleHistorial(id: String)
-}
+enum AdminTab: Hashable { case dashboard, abrirCerrar, historial, estadistica }
+enum AdminRoute: Hashable { case detalleHistorial(id: String) }
 
 final class AdminRouter: ObservableObject {
     @Published var selected: AdminTab = .dashboard
 
-    // Un stack por tab
-    @Published var paths: [AdminTab: NavigationPath] = [
-        .dashboard: NavigationPath(),
-        .abrirCerrar: NavigationPath(),
-        .historial: NavigationPath(),
-        .estadistica: NavigationPath()
-    ]
+    // Un path por tab para evitar ambigüedades
+    @Published var dashboardPath = NavigationPath()
+    @Published var abrirCerrarPath = NavigationPath()
+    @Published var historialPath = NavigationPath()
+    @Published var estadisticaPath = NavigationPath()
 
     func push(_ route: AdminRoute, on tab: AdminTab) {
-        paths[tab]?.append(route)
+        switch tab {
+        case .dashboard: dashboardPath.append(route)
+        case .abrirCerrar: abrirCerrarPath.append(route)
+        case .historial: historialPath.append(route)
+        case .estadistica: estadisticaPath.append(route)
+        }
     }
 
     func popToRoot(_ tab: AdminTab) {
-        paths[tab] = NavigationPath()
+        switch tab {
+        case .dashboard: dashboardPath = NavigationPath()
+        case .abrirCerrar: abrirCerrarPath = NavigationPath()
+        case .historial: historialPath = NavigationPath()
+        case .estadistica: estadisticaPath = NavigationPath()
+        }
     }
 
     func switchTo(_ tab: AdminTab) {

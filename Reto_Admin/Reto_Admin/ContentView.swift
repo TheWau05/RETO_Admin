@@ -15,29 +15,25 @@ struct ContentView: View {
     var body: some View {
         TabView(selection: $router.selected) {
 
-            // DASHBOARD
-            NavigationStack(path: binding(for: .dashboard)) {
+            NavigationStack(path: $router.dashboardPath) {
                 DashboardAdminView()
             }
             .tabItem { Label("Inicio", systemImage: "square.grid.2x2.fill") }
             .tag(AdminTab.dashboard)
 
-            // ABRIR CERRAR
-            NavigationStack(path: binding(for: .abrirCerrar)) {
+            NavigationStack(path: $router.abrirCerrarPath) {
                 AbrirCerrarVentanillaPadView(api: apiContainer.client)
             }
             .tabItem { Label("Abrir Cerrar", systemImage: "rectangle.portrait.on.rectangle.portrait") }
             .tag(AdminTab.abrirCerrar)
 
-            // HISTORIAL
-            NavigationStack(path: binding(for: .historial)) {
+            NavigationStack(path: $router.historialPath) {
                 HistorialAdminView()
             }
             .tabItem { Label("Historial", systemImage: "list.bullet.rectangle") }
             .tag(AdminTab.historial)
 
-            // ESTADISTICA
-            NavigationStack(path: binding(for: .estadistica)) {
+            NavigationStack(path: $router.estadisticaPath) {
                 EstadisticaVentanillaView(api: apiContainer.client)
             }
             .tabItem { Label("Estadistica", systemImage: "gearshape") }
@@ -47,18 +43,14 @@ struct ContentView: View {
         .environmentObject(admin)
         .environmentObject(apiContainer)
         .environmentObject(router)
-        // cada vez que cambias de tab limpias el stack del destino
-        .onChange(of: router.selected) { newTab in
-            router.popToRoot(newTab)
-        }
+        .onChange(of: router.selected) { router.popToRoot($0) }
     }
+}
 
-    // helper para enlazar cada path del diccionario
-    private func binding(for tab: AdminTab) -> Binding<NavigationPath> {
-        Binding(
-            get: { router.paths[tab] ?? NavigationPath() },
-            set: { router.paths[tab] = $0 }
-        )
-    }
+#Preview {
+    ContentView()
+        .environmentObject(AdminManager())
+        .environmentObject(APIContainer(client: MockAdminAPI()))
+        .environmentObject(AdminRouter())
 }
 

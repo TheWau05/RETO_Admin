@@ -181,3 +181,44 @@ struct StatCard: View {
         .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
     }
 }
+
+struct DataTable: View {
+    let headers: [String]
+    let rows: [[String]]
+    var columnWidth: CGFloat = 100
+    var rowHeight: CGFloat = 28
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack(spacing: 0) {
+                ForEach(headers, id: \.self) { h in
+                    cell(h, bold: true)
+                        .background(AdminColors.marca.opacity(0.1))
+                }
+            }
+            .background(AdminColors.marca.opacity(0.2))
+
+            // Rows
+            ForEach(0..<rows.count, id: \.self) { r in
+                HStack(spacing: 0) {
+                    ForEach(rows[r], id: \.self) { v in
+                        cell(v)
+                    }
+                }
+                .background(r.isMultiple(of: 2) ? Color.clear : AdminColors.marca.opacity(0.05))
+            }
+        }
+        .overlay(RoundedRectangle(cornerRadius: 4).stroke(AdminColors.marca, lineWidth: 0.8))
+    }
+
+    @ViewBuilder
+    private func cell(_ text: String, bold: Bool = false) -> some View {
+        Text(text)
+            .font(bold ? .caption.bold() : .caption)
+            .foregroundColor(bold ? AdminColors.marca : .primary)
+            .frame(width: columnWidth, height: rowHeight, alignment: .leading)
+            .padding(.horizontal, 4)
+            .overlay(Rectangle().stroke(AdminColors.marca.opacity(0.3), lineWidth: 0.5))
+    }
+}
