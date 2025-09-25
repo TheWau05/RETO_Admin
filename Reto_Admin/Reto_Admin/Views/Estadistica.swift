@@ -1,8 +1,15 @@
 //
+<<<<<<< HEAD
 //  AdminView.swift
 //  Reto_Admin
 //
 //  Created by 박진혁 on 9/23/25.
+=======
+//  Estadistica.swift
+//  Reto_Admin
+//
+//  Created by ediaz205  on 9/24/25.
+>>>>>>> 6a8066c9ba667a236937fc14a7efd0e3c828a270
 //
 
 import SwiftUI
@@ -10,14 +17,34 @@ import Charts
 
 struct EstadisticaVentanillaView: View {
     @EnvironmentObject var store: CitasStore
+<<<<<<< HEAD
 
     struct BarDatum: Identifiable { let id = UUID(); let label: String; let value: Int }
+=======
+    
+    private var currentDate: Date {
+        Date()
+    }
+    private var currentHour: Int {
+        Calendar.current.component(.hour, from: Date())
+    }
+    
+    private var orderedHours: [Int] {
+        let now = Calendar.current.component(.hour, from: Date())
+        return (0..<24).map { (now + $0) % 24 }
+    }
+
+    struct BarDatum: Identifiable {
+        let id = UUID(); let label: String; let value: Int
+    }
+>>>>>>> 6a8066c9ba667a236937fc14a7efd0e3c828a270
 
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
                 // Resumen (basado en citas)
                 HStack(spacing: 12) {
+<<<<<<< HEAD
                     StatCard(title: "Total de citas",
                              value: store.totalCitas,
                              color: .green)
@@ -42,12 +69,71 @@ struct EstadisticaVentanillaView: View {
                 }
             }
             .padding()
+=======
+                    StatCard(title: "Turnos Proximos",
+                             value: 15,
+                             color: .green)
+                    
+                    StatCard(title: "Ventanillas Abiertas",
+                             value: store.maxPorVentanilla,
+                             color: .orange)
+                }
+                
+                VStack(spacing: 10) {
+                    HStack(spacing: 12) {
+                        StatCard(title: "duracion servicio por promedio",
+                                 value: store.maxPorVentanilla,
+                                 color: .blue)
+                        
+                        StatCard(title: "Duracion espara promedio",
+                                 value: store.maxPorVentanilla,
+                                 color: .black)
+                    }
+                }
+            }
+            .padding()
+            
+            // --- Remaining Charts ---
+            Text("Tiempo de Espera y Duración de Turno (past)")
+            Chart {
+                ForEach(orderedHours, id: \.self) { hour in
+                    BarMark(
+                        x: .value("Hour", String(hour)),
+                        y: .value("Value", Double.random(in: 0...10))
+                    )
+                }
+            }
+            .chartXAxis {
+                AxisMarks(values: orderedHours.map { String($0) })
+            }
+            .frame(height: 200)
+            .padding()
+            
+            Text("Turnos 24h past and future")
+            Chart {
+                ForEach(orderedHours, id: \.self) { hour in
+                    BarMark(
+                        x: .value("Hour", String(hour)),
+                        y: .value("Value", Double.random(in: 0...10))
+                    )
+                }
+            }
+            .chartXAxis {
+                AxisMarks(values: orderedHours.map { String($0) })
+            }
+            .frame(height: 200)
+            .padding()
+>>>>>>> 6a8066c9ba667a236937fc14a7efd0e3c828a270
         }
         .navigationTitle("Estadística")
     }
 }
 
+<<<<<<< HEAD
 // Tarjeta simple reutilizable
+=======
+
+>>>>>>> 6a8066c9ba667a236937fc14a7efd0e3c828a270
 struct StatCard: View {
     let title: String
     let value: Int
