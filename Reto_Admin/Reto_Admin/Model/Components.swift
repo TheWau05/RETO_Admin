@@ -222,3 +222,25 @@ struct DataTable: View {
             .overlay(Rectangle().stroke(AdminColors.marca.opacity(0.3), lineWidth: 0.5))
     }
 }
+
+// Header de página uniforme 
+struct PageHeader<Trailing: View>: View {
+    var title: String
+    @ViewBuilder var trailing: () -> Trailing
+
+    init(title: String, @ViewBuilder trailing: @escaping () -> Trailing = { EmptyView() }) {
+        self.title = title
+        self.trailing = trailing
+    }
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.largeTitle.bold())
+                .foregroundStyle(AdminColors.text)
+            Spacer()
+            trailing()
+        }
+        .padding(.top, 8)
+    }
+}

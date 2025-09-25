@@ -11,13 +11,19 @@ struct EstadisticaVentanillaView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
+                PageHeader(title: "Estadística") {
+                    Image(systemName: "chart.bar.fill")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(AdminColors.acento)
+                }
+
                 if vm.loading {
                     ProgressView().padding()
                 } else if let err = vm.errorText {
                     Text(err).foregroundStyle(Color.red)
                 } else {
                     HStack(spacing: 12) {
-                        StatCard(title: "Turnos Proximos",
+                        StatCard(title: "Turnos Próximos",
                                  value: totalFuture(),
                                  color: Color.green)
 
@@ -27,7 +33,7 @@ struct EstadisticaVentanillaView: View {
                     }
 
                     HStack(spacing: 12) {
-                        StatCard(title: "Duracion servicio promedio",
+                        StatCard(title: "Duración servicio promedio",
                                  value: avg(vm.averages.map { $0.avgServiceMinutes }),
                                  color: Color.blue)
 
@@ -38,6 +44,7 @@ struct EstadisticaVentanillaView: View {
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Tiempo de espera y duración por hora")
+                            .font(.headline)
                         Chart {
                             ForEach(vm.averages) { row in
                                 BarMark(x: .value("Hora", row.hourStart, unit: .hour),
@@ -54,6 +61,7 @@ struct EstadisticaVentanillaView: View {
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Turnos 24h pasado y futuro")
+                            .font(.headline)
                         Chart {
                             ForEach(vm.comparison) { item in
                                 LineMark(x: .value("Hora", item.hourStart, unit: .hour),
@@ -68,7 +76,8 @@ struct EstadisticaVentanillaView: View {
             }
             .padding()
         }
-        .navigationTitle("Estadística")
+        .navBarStyleGray()
+        .tint(AdminColors.marca)
         .task { await vm.load() }
     }
 

@@ -16,16 +16,12 @@ struct DashboardAdminView: View {
             Color(.systemGray6).ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    HStack {
-                        Text("Modo Administrador")
-                            .font(.largeTitle.bold())
-                            .foregroundColor(AdminColors.text)
-                        Spacer()
+
+                    PageHeader(title: "Modo Administrador") {
                         Image(systemName: "person.circle.fill")
                             .font(.system(size: 34))
-                            .foregroundColor(AdminColors.acento)
+                            .foregroundStyle(AdminColors.acento)
                     }
-                    .padding(.top, 8)
 
                     Button { router.switchTo(.abrirCerrar) } label: {
                         AdminActionCard(title: "Abrir Cerrar ventanillas",
@@ -43,8 +39,8 @@ struct DashboardAdminView: View {
                                         color: AdminColors.marca)
                     }
 
-                    HStack {
-                        Spacer()
+                    // Spreadsheets centradas
+                    HStack { Spacer()
                         TablesBlock(api: apiContainer.client)
                             .frame(maxWidth: 980)
                         Spacer()

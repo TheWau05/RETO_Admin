@@ -25,33 +25,35 @@ struct AbrirCerrarVentanillaPadView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.white.ignoresSafeArea()
+                Color(.systemGray6).ignoresSafeArea()
                 GeometryReader { geo in
                     let cols = columnasPara(ancho: geo.size.width)
                     let cardWidth = min(geo.size.width - 48, 980)
 
-                    VStack(spacing: AdminTheme.spacing) {
-                        encabezado
-                        selectorHoras(cardWidth: cardWidth, columnas: cols)
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: AdminTheme.spacing) {
 
-                        PrimaryButton(
-                            title: sending ? "Procesando..." : (cerrada ? "Abrir ventanilla" : "Cerrar ventanilla")
-                        ) {
-                            Task { await onPrimaryButtonTap() }
-                        }
-                        .disabled(horaSeleccionada == nil || sending)
+                            PageHeader(title: "Ventanilla") {
+                                Image(systemName: cerrada ? "lock.fill" : "lock.open.fill")
+                                    .font(.system(size: 24, weight: .semibold))
+                                    .foregroundStyle(AdminColors.acento)
+                            }
 
-                        if let e = errorText {
-                            Text(e).foregroundStyle(Color.red)
+                            encabezado
+                            selectorHoras(cardWidth: cardWidth, columnas: cols)
+
+                            PrimaryButton(
+                                title: sending ? "Procesando..." : (cerrada ? "Abrir ventanilla" : "Cerrar ventanilla")
+                            ) { Task { await onPrimaryButtonTap() } }
+                            .disabled(horaSeleccionada == nil || sending)
+
+                            if let e = errorText { Text(e).foregroundStyle(.red) }
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 20)
                     }
-                    .padding(.top, 40)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
                 }
             }
-            .navigationTitle("Abrir Cerrar Ventanas")
-            .navigationBarTitleDisplayMode(.inline)
             .navBarStyleGray()
             .tint(AdminColors.marca)
         }
@@ -59,10 +61,6 @@ struct AbrirCerrarVentanillaPadView: View {
 
     private var encabezado: some View {
         VStack(spacing: 14) {
-            Text("Ventanilla")
-                .font(.system(size: 40, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.black)
-
             HStack(spacing: 22) {
                 VentanillaMenu(value: $ventanilla) { syncEstadoConSeleccion() }
 
@@ -101,53 +99,32 @@ struct AbrirCerrarVentanillaPadView: View {
         return Array(repeating: GridItem(.flexible(), spacing: 16), count: count)
     }
 
-    private func estadoDe(vent: Int, hora: String) -> Bool {
-        estados[vent]?[hora] ?? true
-    }
-
+    private func estadoDe(vent: Int, hora: String) -> Bool { estados[vent]?[hora] ?? true }
     private func setEstado(vent: Int, hora: String, cerrada: Bool) {
         var mapa = estados[vent] ?? [:]
         mapa[hora] = cerrada
         estados[vent] = mapa
     }
+    private func guardarEstadoActual() { guard let h = horaSeleccionada else { return }; setEstado(vent: ventanilla, hora: h, cerrada: cerrada) }
+    private func syncEstadoConSeleccion() { guard let h = horaSeleccionada else { return }; cerrada = estadoDe(vent: ventanilla, hora: h) }
 
-    private func guardarEstadoActual() {
-        guard let h = horaSeleccionada else { return }
-        setEstado(vent: ventanilla, hora: h, cerrada: cerrada)
-    }
-
-    private func syncEstadoConSeleccion() {
-        guard let h = horaSeleccionada else { return }
-        cerrada = estadoDe(vent: ventanilla, hora: h)
-    }
-
-    // MARK: - Actions
     private func onPrimaryButtonTap() async {
-        guard let _ = horaSeleccionada else {
-            errorText = "Selecciona una hora primero."
-            return
-        }
-
-        // 1) Optimistic UI: alternamos el estado local inmediatamente
+        guard horaSeleccionada != nil else { errorText = "Selecciona una hora primero."; return }
         let newClosed = !cerrada
         let previous = cerrada
         cerrada = newClosed
         sending = true
         errorText = nil
-
         do {
             try await enviarEstado(newClosed)
-            guardarEstadoActual() // persistimos en el diccionario local
+            guardarEstadoActual()
         } catch {
-            // 2) Revertimos si falla
             cerrada = previous
             errorText = "No se pudo enviar. Intenta de nuevo."
         }
-
         sending = false
     }
 
-    /// Envía al API el estado indicado (true = cerrada, false = abierta)
     private func enviarEstado(_ closed: Bool) async throws {
         guard let h = horaSeleccionada else { return }
         let comps = h.split(separator: ":")
