@@ -116,4 +116,6 @@ struct AbrirCerrarVentanillaPadView: View {
     }
 }
 
-#Preview { AbrirCerrarVentanillaPadView() }
+#Preview {
+    AbrirCerrarVentanillaPadView()
+}

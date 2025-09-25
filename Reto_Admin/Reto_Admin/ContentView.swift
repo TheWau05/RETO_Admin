@@ -21,8 +21,8 @@ struct ContentView: View {
             NavigationStack { HistorialAdminView() }
                 .tabItem { Label("Historial", systemImage: "list.bullet.rectangle") }
 
-            NavigationStack { AdminView() }
-                .tabItem { Label("Admin", systemImage: "gearshape") }
+            NavigationStack { EstadisticaVentanillaView() }
+                .tabItem { Label("Estadistica", systemImage: "gearshape") }
         }
         .tint(AdminColors.marca)
         .environmentObject(admin)

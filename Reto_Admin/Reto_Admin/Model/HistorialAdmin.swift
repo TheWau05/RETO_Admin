@@ -75,3 +75,22 @@ final class AdminManager: ObservableObject {
     var abiertasCount: Int { ventanillas.filter(\.abierta).count }
     var cerradasCount: Int { ventanillas.count - abiertasCount }
 }
+
+
+struct VentanillaCitas: Identifiable, Hashable {
+    let id = UUID()
+    var nombre: String
+    var citas: Int
+}
+
+final class CitasStore: ObservableObject {
+    @Published var items: [VentanillaCitas] = [
+        .init(nombre: "Ventanilla 1", citas: 12),
+        .init(nombre: "Ventanilla 2", citas: 8),
+        .init(nombre: "Ventanilla 3", citas: 16),
+        .init(nombre: "Ventanilla 4", citas: 5)
+    ]
+
+    var totalCitas: Int { items.reduce(0) { $0 + $1.citas } }
+    var maxPorVentanilla: Int { items.map(\.citas).max() ?? 0 }
+}
