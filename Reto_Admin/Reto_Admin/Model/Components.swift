@@ -8,6 +8,7 @@
 import SwiftUI
 import UIKit
 import Foundation
+import Charts
 
 enum AdminColors {
     static let marca      = Color(red: 1/255,   green: 104/255, blue: 138/255)
@@ -242,5 +243,30 @@ struct PageHeader<Trailing: View>: View {
             trailing()
         }
         .padding(.top, 8)
+    }
+}
+
+struct TurnosChart: View {
+    let title: String
+    let orderedHours: [Int]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+            
+            Chart {
+                ForEach(orderedHours, id: \.self) { hour in
+                    BarMark(
+                        x: .value("Hour", String(hour)),
+                        y: .value("Value", Double.random(in: 0...10))
+                    )
+                }
+            }
+            .chartXAxis {
+                AxisMarks(values: orderedHours.map { String($0) })
+            }
+            .frame(height: 200)
+            .padding()
+        }
     }
 }
