@@ -8,6 +8,8 @@
 import SwiftUI
 import UIKit
 import Foundation
+import Charts
+
 
 enum AdminColors {
     static let marca      = Color(red: 1/255,   green: 104/255, blue: 138/255)
@@ -182,46 +184,95 @@ struct StatCard: View {
     }
 }
 
-struct DataTable: View {
-    let headers: [String]
-    let rows: [[String]]
-    var columnWidth: CGFloat = 100
-    var rowHeight: CGFloat = 28
+public struct DataTable: View {
+    public let headers: [String]
+    public let rows: [[String]]
+    public var columnWidth: CGFloat = 100
+    public var rowHeight: CGFloat = 28
 
-    var body: some View {
+    public init(headers: [String], rows: [[String]],
+                columnWidth: CGFloat = 100, rowHeight: CGFloat = 28) {
+        self.headers = headers
+        self.rows = rows
+        self.columnWidth = columnWidth
+        self.rowHeight = rowHeight
+    }
+
+    public var body: some View {
         VStack(spacing: 0) {
-            // Header
+            // Header row
             HStack(spacing: 0) {
                 ForEach(headers, id: \.self) { h in
                     cell(h, bold: true)
-                        .background(AdminColors.marca.opacity(0.1))
+                        .background(AdminColors.marca.opacity(0.10))
                 }
             }
-            .background(AdminColors.marca.opacity(0.2))
+            .background(AdminColors.marca.opacity(0.20))
 
-            // Rows
-            ForEach(0..<rows.count, id: \.self) { r in
+
+            ForEach(rows.indices, id: \.self) { r in
                 HStack(spacing: 0) {
                     ForEach(rows[r], id: \.self) { v in
                         cell(v)
                     }
                 }
-                .background(r.isMultiple(of: 2) ? Color.clear : AdminColors.marca.opacity(0.05))
+                .background(r.isMultiple(of: 2) ? Color.clear
+                                                : AdminColors.marca.opacity(0.05))
             }
         }
-        .overlay(RoundedRectangle(cornerRadius: 4).stroke(AdminColors.marca, lineWidth: 0.8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 4)
+                .stroke(AdminColors.marca, lineWidth: 0.8)
+        )
     }
 
     @ViewBuilder
     private func cell(_ text: String, bold: Bool = false) -> some View {
         Text(text)
             .font(bold ? .caption.bold() : .caption)
-            .foregroundColor(bold ? AdminColors.marca : .primary)
+            .foregroundColor(bold ? AdminColors.marca : AdminColors.text)
             .frame(width: columnWidth, height: rowHeight, alignment: .leading)
             .padding(.horizontal, 4)
-            .overlay(Rectangle().stroke(AdminColors.marca.opacity(0.3), lineWidth: 0.5))
+            .overlay(Rectangle().stroke(AdminColors.marca.opacity(0.30), lineWidth: 0.5))
     }
 }
+
+
+public struct TablesBlock: View {
+    public let venRows: [[String]]
+    public let empRows: [[String]]
+
+    private let venHeaders = ["Ventanilla_Id", "AvgServiceMin_Ven", "AvgWaitMin_Ven"]
+    private let empHeaders = ["Emp_Id", "AvgServiceMin", "AvgWaitMin"]
+
+    public init(venRows: [[String]], empRows: [[String]]) {
+        self.venRows = venRows
+        self.empRows = empRows
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Promedios por ventanilla")
+                    .font(.headline)
+                    .foregroundColor(AdminColors.marca)
+                DataTable(headers: venHeaders, rows: venRows, columnWidth: 180)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Promedios por empleado")
+                    .font(.headline)
+                    .foregroundColor(AdminColors.marca)
+                DataTable(headers: empHeaders, rows: empRows, columnWidth: 140)
+            }
+        }
+        .padding()
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color(.systemBackground)))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(AdminColors.marca, lineWidth: 1))
+        .shadow(color: AdminColors.marca.opacity(0.20), radius: 6, x: 0, y: 3)
+    }
+}
+
 
 // Header de página uniforme 
 struct PageHeader<Trailing: View>: View {

@@ -98,12 +98,7 @@ struct EmployeeBasic: Codable, Identifiable, Hashable {
     }
 }
 
-struct VentanillaAvg: Codable, Identifiable {
-    var id: Int { ventanillaId }
-    let ventanillaId: Int
-    let avgServiceMinutes: Double
-    let avgWaitMinutes: Double
-}
+
 
 struct UserTurn: Codable, Identifiable {
     var id: Int { turnoId ?? idRaw ?? -1 }
