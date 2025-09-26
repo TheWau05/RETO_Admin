@@ -131,7 +131,6 @@ final class HTTPAdminAPI: AdminAPI {
     }
 }
 
-
 struct HistorialUs: Codable, Identifiable {
     let id = UUID()
     let pacienteName: String
