@@ -130,3 +130,40 @@ final class HTTPAdminAPI: AdminAPI {
         }
     }
 }
+
+struct HistorialUs: Codable, Identifiable {
+    let id = UUID()
+    let pacienteName: String
+    let perscriptionId: String
+    let endTime: Date // Cambiado a Date para manejarlo mejor en Swift
+
+    enum CodingKeys: String, CodingKey {
+        case pacienteName = "PacienteName"
+        case perscriptionId = "Perscription_Id"
+        case endTime = "End_Time"
+    }
+}
+
+func fetchHistorial(fecha: Date, ventanillaId: Int) async throws -> [HistorialUs] {
+    // 1. Convertimos la fecha de Swift a un String en formato YYYY-MM-DD para la URL
+    let urlDateFormatter = DateFormatter()
+    urlDateFormatter.dateFormat = "yyyy-MM-dd"
+    let fechaString = urlDateFormatter.string(from: fecha)
+
+    guard let url = URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206/ventanillas/\(ventanillaId)/history?fecha=\(fechaString)") else {
+        throw URLError(.badURL)
+    }
+    
+    // 2. Hacemos la llamada de red
+    let (data, _) = try await URLSession.shared.data(from: url)
+    
+    // 3. Creamos un decodificador con el formato de fecha que envía la API
+    let decoder = JSONDecoder()
+    let apiDateFormatter = DateFormatter()
+    apiDateFormatter.locale = Locale(identifier: "en_US_POSIX")
+    apiDateFormatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz" // Formato RFC 1123 que usa Flask
+    decoder.dateDecodingStrategy = .formatted(apiDateFormatter)
+    
+    // 4. Decodificamos el JSON en nuestro arreglo de [HistorialUs]
+    return try decoder.decode([HistorialUs].self, from: data)
+}
