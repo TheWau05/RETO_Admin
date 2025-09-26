@@ -112,3 +112,122 @@ final class CitasStore: ObservableObject {
     var totalCitas: Int { items.reduce(0) { $0 + $1.citas } }
     var maxPorVentanilla: Int { items.map(\.citas).max() ?? 0 }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+// Hacer structs. Dalr codable, identifiable
+// MARK: - For /stats/turnos/24h-comparison
+struct Turnos24ComparisonItem: Codable, Identifiable {
+    let id = UUID()
+    let hourStart: Date
+    let period: String
+    let turnosCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case hourStart = "HourStart"
+        case period = "Period"
+        case turnosCount = "TurnosCount"
+    }
+}
+
+// MARK: - For /stats/turnos/24h-averages
+struct Turno24AverageHour: Codable, Identifiable {
+    let id = UUID()
+    let hourStart: Date
+    let avgServiceMinutes: Double?
+    let avgWaitMinutes: Double?
+    
+    enum CodingKeys: String, CodingKey {
+        case hourStart = "HourStart"
+        case avgServiceMinutes = "AvgServiceDuration_Minutes"
+        case avgWaitMinutes = "AvgWaitTime_Minutes"
+    }
+}
+
+// MARK: - For /ventanillas/status
+struct VentanillaStatus: Codable, Identifiable {
+    let id: Int
+    let disponible: Bool
+    let empId: Int?
+    let estatus: String
+
+    enum CodingKeys: String, CodingKey {
+        case id = "Id"
+        case disponible = "Disponible"
+        case empId = "Emp_Id"
+        case estatus = "Estatus"
+    }
+}
+
+
+
+
+// Función para darle formato a la hora
+let rfc1123Formatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+    formatter.timeZone = TimeZone(secondsFromGMT: 0)
+    return formatter
+}()
+
+// Hacer fetch
+// MARK: - Función para traer turnos desde la API
+func fetchTurnos24ComparisonItem() async throws -> [Turnos24ComparisonItem] {
+    guard let url = URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206/stats/turnos/24h-comparison") else {
+        throw URLError(.badURL)
+    }
+    
+    let (data, _) = try await URLSession.shared.data(from: url)
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .formatted(rfc1123Formatter)
+    return try decoder.decode([Turnos24ComparisonItem].self, from: data)
+}
+
+// MARK: - Función para traer promedio turnos desde la API
+func fetchTurno24AverageHour() async throws -> [Turno24AverageHour] {
+    guard let url = URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206/stats/turnos/24h-averages") else {
+        throw URLError(.badURL)
+    }
+    
+    let (data, _) = try await URLSession.shared.data(from: url)
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .formatted(rfc1123Formatter)
+    return try decoder.decode([Turno24AverageHour].self, from: data)
+}
+
+// MARK: - Función para traer ventanillas desde la API
+func fetchVentanillasStatus() async throws -> [VentanillaStatus] {
+    guard let url = URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206/ventanillas/status") else {
+        throw URLError(.badURL)
+    }
+    
+    let (data, _) = try await URLSession.shared.data(from: url)
+    let decoder = JSONDecoder()
+    return try decoder.decode([VentanillaStatus].self, from: data)
+}
+
+// Crear estructura para acomodar turnos en bins
+struct TurnosComparisonBin: Identifiable {
+    let id = UUID()
+    let hour: Int       // 0–23
+    let period: String  // "Past" or "Future"
+    let count: Int
+}
+
+// Crear estructura para acomodar turnos AVGs en bins
+struct TurnosAverageBin: Identifiable {
+    let id = UUID()
+    let hour: Int
+    let type: String // "Espera" or "Servicio"
+    let value: Double
+}
