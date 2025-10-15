@@ -10,15 +10,15 @@ import SwiftUI
 struct AbrirCerrarVentanillaPadView: View {
     let api: AdminAPI
 
-    // Estado de la pantalla
     @State private var ventanilla = 1
     @State private var cerrada = true
     @State private var empleados: [EmployeeBasic] = []
-    @State private var empleadoSel: EmployeeBasic? = nil
-    @State private var asignados: [Int: EmployeeBasic] = [:] // empleado por ventanilla
-    @State private var estados: [Int: Bool] = [:]            // cerrada/abierta por ventanilla
+    @State private var empleadoSel: EmployeeBasic?
+    @State private var asignados: [Int: EmployeeBasic] = [:]
+    @State private var estados: [Int: Bool] = [:]
     @State private var loading = false
     @State private var sending = false
+    @State private var serviceDown = false
     @State private var errorText: String?
 
     var body: some View {
@@ -26,42 +26,18 @@ struct AbrirCerrarVentanillaPadView: View {
             ZStack {
                 Color(.systemGray6).ignoresSafeArea()
                 GeometryReader { geo in
-                    let cardWidth = min(geo.size.width - 48, 980)
-
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: AdminTheme.spacing) {
-
-                            // Header
-                            PageHeader(title: headerTitulo) {
-                                Image(systemName: cerrada ? "lock.fill" : "lock.open.fill")
-                                    .font(.system(size: 24, weight: .semibold))
-                                    .foregroundStyle(AdminColors.acento)
-                            }
-
-                            // Ventanilla + Toggle
-                            encabezado(cardWidth: cardWidth)
-
-                            // Dropdown de empleados
-                            empleadoDropdown(cardWidth: cardWidth)
-
-                            // Botón principal
-                            PrimaryButton(
-                                title: sending ? "Procesando..." : (cerrada ? "Abrir ventanilla" : "Cerrar ventanilla")
-                            ) { Task { await onPrimaryButtonTap() } }
-                            .disabled(sending) // no lo bloqueamos por empleado nulo
-
-                            if let e = errorText {
-                                Text(e).foregroundStyle(.red).padding(.top, 6)
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 20)
+                    VStack {
+                        Spacer(minLength: 40)
+                        contentCard(width: geo.size.width * 0.9, height: geo.size.height * 0.65)
+                        Spacer(minLength: 60)
                     }
+                    .frame(width: geo.size.width, height: geo.size.height)
                 }
             }
-            .navBarStyleGray()
+            .navigationTitle("Abrir / Cerrar Ventanilla")
+            .navigationBarTitleDisplayMode(.inline)
             .tint(AdminColors.marca)
-            .task { await loadEmployees() } // carga al entrar
+            .task { await loadEmployees() }
             .onAppear {
                 syncEstadoConSeleccion()
                 syncEmpleadoConVentanilla()
@@ -69,138 +45,81 @@ struct AbrirCerrarVentanillaPadView: View {
         }
     }
 
-    // MARK: - Títulos
-
-    private var headerTitulo: String {
-        let emp = empleadoSel?.name ?? "Sin empleado"
-        return "Ventanilla \(ventanilla) · \(emp)"
-    }
-
-    // MARK: - Carga de empleados
-
-    private func loadEmployees() async {
-        loading = true
-        errorText = nil
-        do {
-            let xs = try await api.unassignedEmployees()
-            await MainActor.run {
-                empleados = xs.isEmpty ? fallbackEmployees() : xs
-                if empleadoSel == nil { empleadoSel = empleados.first }
-                syncEmpleadoConVentanilla()
-                loading = false
-                if xs.isEmpty { errorText = "No se pudo cargar empleados del servidor. Usando lista local." }
+    private func contentCard(width: CGFloat, height: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 44) {
+            headerSection
+            empleadoSelector
+            actionButton
+            if let e = errorText {
+                Text(e)
+                    .foregroundStyle(.red)
+                    .font(.callout)
             }
-        } catch {
-            await MainActor.run {
-                empleados = fallbackEmployees()
-                if empleadoSel == nil { empleadoSel = empleados.first }
-                loading = false
-                errorText = "Error al cargar empleados: \(error.localizedDescription). Usando lista local."
+            if serviceDown {
+                Button("Reintentar conexión") { Task { await loadEmployees() } }
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity)
             }
         }
+        .padding(50)
+        .frame(maxWidth: width, minHeight: height)
+        .background(
+            RoundedRectangle(cornerRadius: 36)
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.1), radius: 20, y: 8)
+        )
     }
 
-    private func fallbackEmployees() -> [EmployeeBasic] {
-        [
-            .init(id: 1, name: "Ana López"),
-            .init(id: 2, name: "Bruno Díaz"),
-            .init(id: 3, name: "Carla Ruiz"),
-            .init(id: 4, name: "Diego Pérez"),
-            .init(id: 5, name: "Eva García")
-        ]
-    }
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Ventanilla")
+                        .font(.system(size: 46, weight: .bold))
+                        .foregroundStyle(.primary)
 
-    // MARK: - Estado por ventanilla (UI)
-
-    private func estadoDe(vent: Int) -> Bool { estados[vent] ?? true }
-    private func setEstado(vent: Int, cerrada: Bool) { estados[vent] = cerrada }
-    private func guardarEstadoActual() { setEstado(vent: ventanilla, cerrada: cerrada) }
-    private func syncEstadoConSeleccion() { cerrada = estadoDe(vent: ventanilla) }
-
-    private func syncEmpleadoConVentanilla() {
-        if let e = asignados[ventanilla] {
-            empleadoSel = e
-        } else if empleadoSel == nil {
-            empleadoSel = empleados.first
-        }
-    }
-    private func guardarEmpleadoActual() {
-        if let e = empleadoSel { asignados[ventanilla] = e }
-    }
-
-    // MARK: - Acción principal
-
-    private func onPrimaryButtonTap() async {
-        // usa un empId seguro si por algo sigue nulo
-        let empId = empleadoSel?.id ?? 1
-
-        let newClosed = !cerrada
-        let previous = cerrada
-        cerrada = newClosed
-        sending = true
-        errorText = nil
-        do {
-            try await enviarCambioApi(newClosed, empId: empId)
-            guardarEstadoActual()
-            guardarEmpleadoActual()
-        } catch {
-            cerrada = previous
-            errorText = "No se pudo procesar: \(error.localizedDescription)"
-        }
-        sending = false
-    }
-
-    private func enviarCambioApi(_ closed: Bool, empId: Int) async throws {
-        if closed {
-            try await api.closeVentanilla(ventanillaId: ventanilla)
-        } else {
-            try await api.openVentanilla(ventanillaId: ventanilla, empId: empId)
-        }
-    }
-
-    // MARK: - Subvistas
-
-    private func encabezado(cardWidth: CGFloat) -> some View {
-        VStack(spacing: 14) {
-            HStack(spacing: 22) {
-                VentanillaMenu(value: $ventanilla) {
-                    syncEstadoConSeleccion()
-                    syncEmpleadoConVentanilla()
+                    VentanillaMenu(value: $ventanilla) {
+                        syncEstadoConSeleccion()
+                        syncEmpleadoConVentanilla()
+                    }
+                    .frame(maxWidth: 240)
+                    .padding(.top, 6)
                 }
-                Toggle(isOn: Binding(
-                    get: { cerrada },
-                    set: { v in
-                        cerrada = v
-                        guardarEstadoActual()
-                    })
-                ) {
-                    Text(cerrada ? "Cerrada" : "Abierta")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.black)
+
+                Spacer()
+
+                VStack(spacing: 12) {
+                    Image(systemName: cerrada ? "lock.fill" : "lock.open.fill")
+                        .font(.system(size: 38, weight: .semibold))
+                        .foregroundStyle(AdminColors.acento)
+
+                    if let emp = empleadoSel {
+                        Text(emp.name)
+                            .font(.system(size: 24, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Sin empleado asignado")
+                            .font(.system(size: 24, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                .toggleStyle(.switch)
-                .tint(AdminColors.marca)
-                .frame(maxWidth: 360)
             }
         }
-        .frame(maxWidth: cardWidth, alignment: .leading)
     }
 
-    private func empleadoDropdown(cardWidth: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionTitle(text: "Asignar empleado")
+    private var empleadoSelector: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Asignar empleado")
+                .font(.system(size: 22, weight: .semibold))
 
             if loading && empleados.isEmpty {
-                // Indicador mientras llega la lista
                 HStack {
                     ProgressView()
                     Text("Cargando empleados…").foregroundStyle(.secondary)
                     Spacer()
                 }
-                .padding(.vertical, 14)
-                .padding(.horizontal, 16)
-                .background(RoundedRectangle(cornerRadius: 14).fill(Color.white))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.gray.opacity(0.25), lineWidth: 1))
+                .padding()
+                .background(RoundedRectangle(cornerRadius: 16).fill(Color(.systemGray6)))
             } else {
                 Menu {
                     ForEach(empleados) { e in
@@ -217,23 +136,103 @@ struct AbrirCerrarVentanillaPadView: View {
                     }
                 } label: {
                     HStack {
-                        Text(empleadoSel?.name ?? "Selecciona empleado")
-                            .font(.system(size: 22, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Color.black)
+                        Text(empleadoSel?.name ?? (serviceDown ? "Servicio no disponible" : "Selecciona empleado"))
+                            .foregroundStyle(.primary)
+                            .font(.system(size: 22))
                         Spacer()
                         Image(systemName: "chevron.down")
-                            .font(.title3)
                             .foregroundStyle(.gray)
+                            .font(.title3)
                     }
-                    .padding(.vertical, 14)
-                    .padding(.horizontal, 16)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(Color.white))
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.gray.opacity(0.25), lineWidth: 1))
-                    .shadow(color: Color.black.opacity(0.05), radius: 4, y: 2)
+                    .padding(.vertical, 18)
+                    .padding(.horizontal, 20)
+                    .background(RoundedRectangle(cornerRadius: 16).fill(Color(.systemGray6)))
                 }
-                .disabled(empleados.isEmpty)
+                .disabled(empleados.isEmpty || serviceDown)
             }
         }
-        .frame(maxWidth: cardWidth, alignment: .leading)
+    }
+
+    private var actionButton: some View {
+        Button {
+            Task { await onPrimaryButtonTap() }
+        } label: {
+            Text(sending ? "Procesando..." : (cerrada ? "Abrir ventanilla" : "Cerrar ventanilla"))
+                .font(.system(size: 26, weight: .bold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 22)
+                .background(AdminColors.marca)
+                .foregroundColor(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+        }
+        .disabled(sending || loading || serviceDown || empleadoSel == nil)
+    }
+
+    // MARK: - Lógica
+
+    private func loadEmployees() async {
+        loading = true
+        serviceDown = false
+        errorText = nil
+        do {
+            let xs = try await api.unassignedEmployees()
+            await MainActor.run {
+                empleados = xs
+                empleadoSel = asignados[ventanilla] ?? xs.first
+                loading = false
+            }
+        } catch {
+            await MainActor.run {
+                empleados = []
+                empleadoSel = nil
+                loading = false
+                serviceDown = true
+                errorText = "Servicio no disponible. Verifica la red o intenta más tarde."
+            }
+        }
+    }
+
+    private func estadoDe(vent: Int) -> Bool { estados[vent] ?? true }
+    private func setEstado(vent: Int, cerrada: Bool) { estados[vent] = cerrada }
+    private func guardarEstadoActual() { setEstado(vent: ventanilla, cerrada: cerrada) }
+    private func syncEstadoConSeleccion() { cerrada = estadoDe(vent: ventanilla) }
+
+    private func syncEmpleadoConVentanilla() {
+        if let e = asignados[ventanilla] {
+            empleadoSel = e
+        } else if empleadoSel == nil && !empleados.isEmpty {
+            empleadoSel = empleados.first
+        }
+    }
+    private func guardarEmpleadoActual() {
+        if let e = empleadoSel { asignados[ventanilla] = e }
+    }
+
+    private func onPrimaryButtonTap() async {
+        if serviceDown { return }
+        guard let empId = empleadoSel?.id else { return }
+
+        let newClosed = !cerrada
+        let previous = cerrada
+        cerrada = newClosed
+        sending = true
+        errorText = nil
+        do {
+            try await enviarCambioApi(newClosed, empId: empId)
+            guardarEstadoActual()
+            guardarEmpleadoActual()
+        } catch {
+            cerrada = previous
+            errorText = "No se pudo procesar el cambio."
+        }
+        sending = false
+    }
+
+    private func enviarCambioApi(_ closed: Bool, empId: Int) async throws {
+        if closed {
+            try await api.closeVentanilla(ventanillaId: ventanilla)
+        } else {
+            try await api.openVentanilla(ventanillaId: ventanilla, empId: empId)
+        }
     }
 }
