@@ -80,7 +80,7 @@ struct AdminActionCard: View {
 }
 
 struct VentanillaMenu: View {
-    var range: ClosedRange<Int> = 1...5
+    var range: ClosedRange<Int> = 1...8
     @Binding var value: Int
     var onChange: () -> Void
     var body: some View {
