@@ -168,9 +168,6 @@ struct VentanillaStatus: Codable, Identifiable {
     }
 }
 
-
-
-
 // Función para darle formato a la hora
 let rfc1123Formatter: DateFormatter = {
     let formatter = DateFormatter()

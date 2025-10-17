@@ -74,23 +74,22 @@ struct EstadisticaVentanillaView: View {
                     StatCard(title: "Turnos Próximos",
                              value: upcomingTurnosCount,
                              color: .green)
-                    
                     StatCard(title: "Ventanillas Abiertas",
                              value: ventanillasAvailableCount,
                              color: .orange)
                 }
-                
+                // Tarketas inferiores
                 HStack(spacing: 12) {
-                    StatCard(title: "Duración servicio promedio",
+                    StatCard(title: "Duración servicio promedio (min)",
                              value: Int(avgService),
                              color: .blue)
-                    
-                    StatCard(title: "Duración espera promedio",
+                    StatCard(title: "Duración espera promedio (min)",
                              value: Int(avgWait),
                              color: .black)
                 }
             }
-            .padding()
+            .padding(.horizontal, 10)
+            .padding(.vertical, 10)
             
             // Turnos Count Graph
             VStack(alignment: .leading, spacing: 8) {
@@ -98,7 +97,6 @@ struct EstadisticaVentanillaView: View {
                     .font(.title2)
                     .bold()
                     .padding(.leading)
-
                 Chart(binnedTurnos) { item in
                     BarMark(
                         x: .value("Hora del Día", item.hour),
@@ -134,9 +132,10 @@ struct EstadisticaVentanillaView: View {
                         }
                     }
                 }
-                .chartLegend(.visible)
-                .frame(height: 300)
             }
+            .chartLegend(.visible)
+            .frame(height: 300)
+            .padding(.horizontal, 10)
             
             // Service and Wait Times Graph
             VStack(alignment: .leading, spacing: 8) {
@@ -182,6 +181,16 @@ struct EstadisticaVentanillaView: View {
                 }
                 .chartLegend(.visible)
                 .frame(height: 300)
+                .padding(.horizontal, 10)
+                
+                // Tables for ventanillas and employees times
+                HStack {
+                    Spacer()
+                    // Visual-only (sin API)
+                    TablesBlock()
+                        .frame(maxWidth: 980)
+                    Spacer()
+                }
                 
             }
         }

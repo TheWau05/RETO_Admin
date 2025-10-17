@@ -37,14 +37,6 @@ struct DashboardAdminView: View {
                                         systemImage: "chart.bar.fill",
                                         color: AdminColors.marca)
                     }
-
-                    HStack {
-                        Spacer()
-                        // Visual-only (sin API)
-                        TablesBlock()
-                            .frame(maxWidth: 980)
-                        Spacer()
-                    }
                 }
                 .padding(.horizontal, 20)
             }
