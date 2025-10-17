@@ -135,7 +135,7 @@ struct HistorialUs: Codable, Identifiable {
     let id = UUID()
     let pacienteName: String
     let perscriptionId: String
-    let endTime: Date // Cambiado a Date para manejarlo mejor en Swift
+    let endTime: Date
 
     enum CodingKeys: String, CodingKey {
         case pacienteName = "PacienteName"
