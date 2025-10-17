@@ -4,6 +4,12 @@
 //
 //  Created by Marco Ramos Jalife on 23/09/25.
 //
+//
+//  AbrirCerrarView.swift
+//  Reto_Admin
+//
+//  Created by Marco Ramos Jalife on 23/09/25.
+//
 
 import SwiftUI
 
@@ -60,6 +66,26 @@ struct AbrirCerrarVentanillaPadView: View {
                     .buttonStyle(.bordered)
                     .frame(maxWidth: .infinity)
             }
+
+            NavigationLink {
+                StatusOverviewView(
+                    ventanillas: allVentanillas,
+                    estados: estados,
+                    asignados: asignados
+                )
+            } label: {
+                HStack {
+                    Image(systemName: "list.bullet.rectangle")
+                    Text("Ver estatus y asignaciones")
+                        .font(.system(size: 20, weight: .semibold))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(AdminColors.marca.opacity(0.12))
+                .foregroundStyle(AdminColors.marca)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+            .padding(.top, 8)
         }
         .padding(50)
         .frame(maxWidth: width, minHeight: height)
@@ -168,7 +194,13 @@ struct AbrirCerrarVentanillaPadView: View {
         .disabled(sending || loading || serviceDown || empleadoSel == nil)
     }
 
-    // MARK: - Lógica
+    private var allVentanillas: [Int] {
+        var s = Set<Int>()
+        s.insert(ventanilla)
+        s.formUnion(estados.keys)
+        s.formUnion(asignados.keys)
+        return Array(s).sorted()
+    }
 
     private func loadEmployees() async {
         loading = true
@@ -234,5 +266,223 @@ struct AbrirCerrarVentanillaPadView: View {
         } else {
             try await api.openVentanilla(ventanillaId: ventanilla, empId: empId)
         }
+    }
+}
+
+struct StatusOverviewView: View {
+    let ventanillas: [Int]
+    let estados: [Int: Bool]
+    let asignados: [Int: EmployeeBasic]
+
+    @State private var filtroVentanilla: Int? = nil
+    @State private var filtroEmpleadoId: Int? = nil
+    @State private var filtroEstado: EstadoFiltro = .todas
+    @State private var query: String = ""
+    @State private var sortKey: SortKey = .ventanilla
+    @State private var ascending: Bool = true
+
+    enum EstadoFiltro: String, CaseIterable, Identifiable {
+        case todas = "Todas"
+        case abiertas = "Abiertas"
+        case cerradas = "Cerradas"
+        var id: String { rawValue }
+    }
+
+    enum SortKey: String, CaseIterable, Identifiable {
+        case ventanilla = "Ventanilla"
+        case nombre = "Nombre"
+        case estado = "Estado"
+        var id: String { rawValue }
+    }
+
+    private var empleadosUnicos: [EmployeeBasic] {
+        let xs = asignados.values
+        let map = Dictionary(grouping: xs, by: { $0.id }).compactMap { $0.value.first }
+        return map.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private var listaFiltrada: [Int] {
+        let filtrada = ventanillas
+            .filter { v in
+                if let f = filtroVentanilla, v != f { return false }
+                if let empId = filtroEmpleadoId {
+                    let asign = asignados[v]?.id
+                    if asign != empId { return false }
+                }
+                switch filtroEstado {
+                case .todas: break
+                case .abiertas:
+                    if (estados[v] ?? true) == true { return false }
+                case .cerradas:
+                    if (estados[v] ?? true) == false { return false }
+                }
+                if query.isEmpty { return true }
+                let nombre = asignados[v]?.name ?? "Sin empleado asignado"
+                let texto = "Ventanilla \(v) \(nombre)"
+                return texto.localizedCaseInsensitiveContains(query)
+            }
+
+        let ordenada: [Int] = filtrada.sorted { a, b in
+            switch sortKey {
+            case .ventanilla:
+                return ascending ? a < b : a > b
+            case .nombre:
+                let na = asignados[a]?.name ?? ""
+                let nb = asignados[b]?.name ?? ""
+                if na.caseInsensitiveCompare(nb) == .orderedSame {
+                    return ascending ? a < b : a > b
+                }
+                return ascending
+                    ? na.localizedCaseInsensitiveCompare(nb) == .orderedAscending
+                    : na.localizedCaseInsensitiveCompare(nb) == .orderedDescending
+            case .estado:
+                let ea = estados[a] ?? true
+                let eb = estados[b] ?? true
+                if ea == eb {
+                    return ascending ? a < b : a > b
+                }
+                return ascending ? (eb && !ea) : (!eb && ea)
+            }
+        }
+        return ordenada
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 12) {
+                filtros
+                List {
+                    ForEach(listaFiltrada, id: \.self) { v in
+                        HStack(spacing: 16) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Ventanilla \(v)")
+                                    .font(.headline)
+                                Text(asignados[v]?.name ?? "Sin empleado asignado")
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            let cerrada = estados[v] ?? true
+                            HStack(spacing: 8) {
+                                Image(systemName: cerrada ? "lock.fill" : "lock.open.fill")
+                                    .foregroundStyle(cerrada ? .red : .green)
+                                Text(cerrada ? "Cerrada" : "Abierta")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(cerrada ? .red : .green)
+                            }
+                        }
+                        .padding(.vertical, 6)
+                    }
+                }
+            }
+            .navigationTitle("Estatus de ventanillas")
+        }
+    }
+
+    private var filtros: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                Menu {
+                    Button("Todas") { filtroVentanilla = nil }
+                    if ventanillas.isEmpty == false {
+                        ForEach(ventanillas.sorted(), id: \.self) { v in
+                            Button("Ventanilla \(v)") { filtroVentanilla = v }
+                        }
+                    }
+                } label: {
+                    chip(texto: filtroVentanilla == nil ? "Ventanillas: Todas" : "Ventanilla \(filtroVentanilla!)")
+                }
+
+                Menu {
+                    Button("Todos") { filtroEmpleadoId = nil }
+                    ForEach(empleadosUnicos) { e in
+                        Button(e.name) { filtroEmpleadoId = e.id }
+                    }
+                } label: {
+                    if let id = filtroEmpleadoId,
+                       let emp = empleadosUnicos.first(where: { $0.id == id }) {
+                        chip(texto: "Empleado: \(emp.name)")
+                    } else {
+                        chip(texto: "Empleados: Todos")
+                    }
+                }
+            }
+
+            Picker("Estado", selection: $filtroEstado) {
+                ForEach(EstadoFiltro.allCases) { s in
+                    Text(s.rawValue).tag(s)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            HStack(spacing: 10) {
+                Picker("Ordenar por", selection: $sortKey) {
+                    ForEach(SortKey.allCases) { k in
+                        Text(k.rawValue).tag(k)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Button {
+                    ascending.toggle()
+                } label: {
+                    Label(ascending ? "Ascendente" : "Descendente",
+                          systemImage: ascending ? "arrow.up.arrow.down.circle" : "arrow.down.arrow.up.circle")
+                        .labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(.bordered)
+            }
+
+            HStack {
+                Image(systemName: "magnifyingglass")
+                TextField("Buscar por nombre o ventanilla", text: $query)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                if query.isEmpty == false {
+                    Button {
+                        query = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemGray6)))
+
+            HStack {
+                Button {
+                    resetFiltros()
+                } label: {
+                    Label("Reiniciar filtros", systemImage: "arrow.counterclockwise")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    private func chip(texto: String) -> some View {
+        HStack(spacing: 8) {
+            Text(texto)
+                .font(.callout.weight(.semibold))
+            Image(systemName: "chevron.down")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemGray6)))
+    }
+
+    private func resetFiltros() {
+        filtroVentanilla = nil
+        filtroEmpleadoId = nil
+        filtroEstado = .todas
+        query = ""
+        sortKey = .ventanilla
+        ascending = true
     }
 }
