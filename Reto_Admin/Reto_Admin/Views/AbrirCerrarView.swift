@@ -13,6 +13,29 @@
 
 import SwiftUI
 
+// 🔒 Clave en UserDefaults
+private let kACVDefaultsKey = "AbrirCerrarVentanilla_State_v2"
+
+// 👤 Snapshot minimalista y 100% Codable para persistencia
+private struct EmployeeMini: Codable, Hashable {
+    let id: Int
+    let name: String
+}
+
+private struct ACVState: Codable {
+    var asignados: [Int: EmployeeMini] = [:] // ventanilla -> empleado (mini)
+    var estados:   [Int: Bool] = [:]         // ventanilla -> cerrada(true)/abierta(false)
+    var ventanillaSeleccionada: Int = 1
+}
+
+// Helpers para mapear entre EmployeeBasic y EmployeeMini
+private extension EmployeeMini {
+    init(from basic: EmployeeBasic) { self.init(id: basic.id, name: basic.name) }
+}
+private extension EmployeeBasic {
+    init(from mini: EmployeeMini) { self.init(id: mini.id, name: mini.name) }
+}
+
 struct AbrirCerrarVentanillaPadView: View {
     let api: AdminAPI
 
@@ -20,7 +43,7 @@ struct AbrirCerrarVentanillaPadView: View {
     @State private var cerrada = true
     @State private var empleados: [EmployeeBasic] = []
     @State private var empleadoSel: EmployeeBasic?
-    @State private var asignados: [Int: EmployeeBasic] = [:]
+    @State private var asignados: [Int: EmployeeBasic] = [:] // en RAM seguimos usando EmployeeBasic
     @State private var estados: [Int: Bool] = [:]
     @State private var loading = false
     @State private var sending = false
@@ -45,8 +68,16 @@ struct AbrirCerrarVentanillaPadView: View {
             .tint(AdminColors.marca)
             .task { await loadEmployees() }
             .onAppear {
+                // 1) Trae estado guardado
+                loadPersistedState()
+                // 2) Sincroniza UI con ese estado
                 syncEstadoConSeleccion()
                 syncEmpleadoConVentanilla()
+            }
+            .onChange(of: ventanilla) { _, _ in
+                syncEstadoConSeleccion()
+                syncEmpleadoConVentanilla()
+                persistState()
             }
         }
     }
@@ -56,11 +87,11 @@ struct AbrirCerrarVentanillaPadView: View {
             headerSection
             empleadoSelector
             actionButton
+
             if let e = errorText {
-                Text(e)
-                    .foregroundStyle(.red)
-                    .font(.callout)
+                Text(e).foregroundStyle(.red).font(.callout)
             }
+
             if serviceDown {
                 Button("Reintentar conexión") { Task { await loadEmployees() } }
                     .buttonStyle(.bordered)
@@ -86,6 +117,7 @@ struct AbrirCerrarVentanillaPadView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 14))
             }
             .padding(.top, 8)
+            .zIndex(0)
         }
         .padding(50)
         .frame(maxWidth: width, minHeight: height)
@@ -107,6 +139,7 @@ struct AbrirCerrarVentanillaPadView: View {
                     VentanillaMenu(value: $ventanilla) {
                         syncEstadoConSeleccion()
                         syncEmpleadoConVentanilla()
+                        persistState()
                     }
                     .frame(maxWidth: 240)
                     .padding(.top, 6)
@@ -119,15 +152,9 @@ struct AbrirCerrarVentanillaPadView: View {
                         .font(.system(size: 38, weight: .semibold))
                         .foregroundStyle(AdminColors.acento)
 
-                    if let emp = empleadoSel {
-                        Text(emp.name)
-                            .font(.system(size: 24, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("Sin empleado asignado")
-                            .font(.system(size: 24, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
+                    Text(empleadoSel?.name ?? "Sin empleado asignado")
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -151,7 +178,7 @@ struct AbrirCerrarVentanillaPadView: View {
                     ForEach(empleados) { e in
                         Button {
                             empleadoSel = e
-                            guardarEmpleadoActual()
+                            guardarEmpleadoActual() // guarda en RAM + persiste
                         } label: {
                             HStack {
                                 Text(e.name)
@@ -173,8 +200,11 @@ struct AbrirCerrarVentanillaPadView: View {
                     .padding(.vertical, 18)
                     .padding(.horizontal, 20)
                     .background(RoundedRectangle(cornerRadius: 16).fill(Color(.systemGray6)))
+                    .contentShape(Rectangle())
                 }
-                .disabled(empleados.isEmpty || serviceDown)
+                // importante: aunque la API no devuelva al asignado, si está persistido el botón sigue sirviendo
+                .disabled(serviceDown)
+                .zIndex(2)
             }
         }
     }
@@ -190,8 +220,10 @@ struct AbrirCerrarVentanillaPadView: View {
                 .background(AdminColors.marca)
                 .foregroundColor(.white)
                 .clipShape(RoundedRectangle(cornerRadius: 16))
+                .contentShape(Rectangle())
         }
         .disabled(sending || loading || serviceDown || empleadoSel == nil)
+        .zIndex(2)
     }
 
     private var allVentanillas: [Int] {
@@ -202,6 +234,7 @@ struct AbrirCerrarVentanillaPadView: View {
         return Array(s).sorted()
     }
 
+    // MARK: - Carga de empleados
     private func loadEmployees() async {
         loading = true
         serviceDown = false
@@ -210,13 +243,15 @@ struct AbrirCerrarVentanillaPadView: View {
             let xs = try await api.unassignedEmployees()
             await MainActor.run {
                 empleados = xs
-                empleadoSel = asignados[ventanilla] ?? xs.first
+                // si ya hay uno persistido para esta ventanilla, NO lo pisamos
+                if empleadoSel == nil {
+                    empleadoSel = asignados[ventanilla] ?? xs.first
+                }
                 loading = false
             }
         } catch {
             await MainActor.run {
                 empleados = []
-                empleadoSel = nil
                 loading = false
                 serviceDown = true
                 errorText = "Servicio no disponible. Verifica la red o intenta más tarde."
@@ -224,9 +259,10 @@ struct AbrirCerrarVentanillaPadView: View {
         }
     }
 
-    private func estadoDe(vent: Int) -> Bool { estados[vent] ?? true }
+    // MARK: - Estado en memoria
+    private func estadoDe(vent: Int) -> Bool { estados[vent] ?? true } // true=cerrada por defecto
     private func setEstado(vent: Int, cerrada: Bool) { estados[vent] = cerrada }
-    private func guardarEstadoActual() { setEstado(vent: ventanilla, cerrada: cerrada) }
+    private func guardarEstadoActual() { setEstado(vent: ventanilla, cerrada: cerrada); persistState() }
     private func syncEstadoConSeleccion() { cerrada = estadoDe(vent: ventanilla) }
 
     private func syncEmpleadoConVentanilla() {
@@ -236,10 +272,15 @@ struct AbrirCerrarVentanillaPadView: View {
             empleadoSel = empleados.first
         }
     }
+
     private func guardarEmpleadoActual() {
-        if let e = empleadoSel { asignados[ventanilla] = e }
+        if let e = empleadoSel {
+            asignados[ventanilla] = e
+            persistState()
+        }
     }
 
+    // MARK: - Acciones
     private func onPrimaryButtonTap() async {
         if serviceDown { return }
         guard let empId = empleadoSel?.id else { return }
@@ -267,222 +308,43 @@ struct AbrirCerrarVentanillaPadView: View {
             try await api.openVentanilla(ventanillaId: ventanilla, empId: empId)
         }
     }
-}
 
-struct StatusOverviewView: View {
-    let ventanillas: [Int]
-    let estados: [Int: Bool]
-    let asignados: [Int: EmployeeBasic]
+    // MARK: - Persistencia (UserDefaults) usando EmployeeMini
+    private func persistState() {
+        var snapshot = ACVState(
+            asignados: asignados.mapValues { EmployeeMini(from: $0) },
+            estados: estados,
+            ventanillaSeleccionada: ventanilla
+        )
+        snapshot.estados[ventanilla] = cerrada
+        if let e = empleadoSel { snapshot.asignados[ventanilla] = EmployeeMini(from: e) }
 
-    @State private var filtroVentanilla: Int? = nil
-    @State private var filtroEmpleadoId: Int? = nil
-    @State private var filtroEstado: EstadoFiltro = .todas
-    @State private var query: String = ""
-    @State private var sortKey: SortKey = .ventanilla
-    @State private var ascending: Bool = true
-
-    enum EstadoFiltro: String, CaseIterable, Identifiable {
-        case todas = "Todas"
-        case abiertas = "Abiertas"
-        case cerradas = "Cerradas"
-        var id: String { rawValue }
-    }
-
-    enum SortKey: String, CaseIterable, Identifiable {
-        case ventanilla = "Ventanilla"
-        case nombre = "Nombre"
-        case estado = "Estado"
-        var id: String { rawValue }
-    }
-
-    private var empleadosUnicos: [EmployeeBasic] {
-        let xs = asignados.values
-        let map = Dictionary(grouping: xs, by: { $0.id }).compactMap { $0.value.first }
-        return map.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-    }
-
-    private var listaFiltrada: [Int] {
-        let filtrada = ventanillas
-            .filter { v in
-                if let f = filtroVentanilla, v != f { return false }
-                if let empId = filtroEmpleadoId {
-                    let asign = asignados[v]?.id
-                    if asign != empId { return false }
-                }
-                switch filtroEstado {
-                case .todas: break
-                case .abiertas:
-                    if (estados[v] ?? true) == true { return false }
-                case .cerradas:
-                    if (estados[v] ?? true) == false { return false }
-                }
-                if query.isEmpty { return true }
-                let nombre = asignados[v]?.name ?? "Sin empleado asignado"
-                let texto = "Ventanilla \(v) \(nombre)"
-                return texto.localizedCaseInsensitiveContains(query)
-            }
-
-        let ordenada: [Int] = filtrada.sorted { a, b in
-            switch sortKey {
-            case .ventanilla:
-                return ascending ? a < b : a > b
-            case .nombre:
-                let na = asignados[a]?.name ?? ""
-                let nb = asignados[b]?.name ?? ""
-                if na.caseInsensitiveCompare(nb) == .orderedSame {
-                    return ascending ? a < b : a > b
-                }
-                return ascending
-                    ? na.localizedCaseInsensitiveCompare(nb) == .orderedAscending
-                    : na.localizedCaseInsensitiveCompare(nb) == .orderedDescending
-            case .estado:
-                let ea = estados[a] ?? true
-                let eb = estados[b] ?? true
-                if ea == eb {
-                    return ascending ? a < b : a > b
-                }
-                return ascending ? (eb && !ea) : (!eb && ea)
-            }
-        }
-        return ordenada
-    }
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 12) {
-                filtros
-                List {
-                    ForEach(listaFiltrada, id: \.self) { v in
-                        HStack(spacing: 16) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Ventanilla \(v)")
-                                    .font(.headline)
-                                Text(asignados[v]?.name ?? "Sin empleado asignado")
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            let cerrada = estados[v] ?? true
-                            HStack(spacing: 8) {
-                                Image(systemName: cerrada ? "lock.fill" : "lock.open.fill")
-                                    .foregroundStyle(cerrada ? .red : .green)
-                                Text(cerrada ? "Cerrada" : "Abierta")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(cerrada ? .red : .green)
-                            }
-                        }
-                        .padding(.vertical, 6)
-                    }
-                }
-            }
-            .navigationTitle("Estatus de ventanillas")
+        do {
+            let data = try JSONEncoder().encode(snapshot)
+            UserDefaults.standard.set(data, forKey: kACVDefaultsKey)
+        } catch {
+            print("Persistencia ACV falló:", error)
         }
     }
 
-    private var filtros: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 10) {
-                Menu {
-                    Button("Todas") { filtroVentanilla = nil }
-                    if ventanillas.isEmpty == false {
-                        ForEach(ventanillas.sorted(), id: \.self) { v in
-                            Button("Ventanilla \(v)") { filtroVentanilla = v }
-                        }
-                    }
-                } label: {
-                    chip(texto: filtroVentanilla == nil ? "Ventanillas: Todas" : "Ventanilla \(filtroVentanilla!)")
-                }
+    private func loadPersistedState() {
+        guard let data = UserDefaults.standard.data(forKey: kACVDefaultsKey) else { return }
+        do {
+            let snapshot = try JSONDecoder().decode(ACVState.self, from: data)
+            estados    = snapshot.estados
+            ventanilla = snapshot.ventanillaSeleccionada
 
-                Menu {
-                    Button("Todos") { filtroEmpleadoId = nil }
-                    ForEach(empleadosUnicos) { e in
-                        Button(e.name) { filtroEmpleadoId = e.id }
-                    }
-                } label: {
-                    if let id = filtroEmpleadoId,
-                       let emp = empleadosUnicos.first(where: { $0.id == id }) {
-                        chip(texto: "Empleado: \(emp.name)")
-                    } else {
-                        chip(texto: "Empleados: Todos")
-                    }
-                }
+            // reconstruimos EmployeeBasic desde minis
+            var asign: [Int: EmployeeBasic] = [:]
+            for (k, v) in snapshot.asignados {
+                asign[k] = EmployeeBasic(from: v)
             }
+            asignados = asign
 
-            Picker("Estado", selection: $filtroEstado) {
-                ForEach(EstadoFiltro.allCases) { s in
-                    Text(s.rawValue).tag(s)
-                }
-            }
-            .pickerStyle(.segmented)
-
-            HStack(spacing: 10) {
-                Picker("Ordenar por", selection: $sortKey) {
-                    ForEach(SortKey.allCases) { k in
-                        Text(k.rawValue).tag(k)
-                    }
-                }
-                .pickerStyle(.segmented)
-
-                Button {
-                    ascending.toggle()
-                } label: {
-                    Label(ascending ? "Ascendente" : "Descendente",
-                          systemImage: ascending ? "arrow.up.arrow.down.circle" : "arrow.down.arrow.up.circle")
-                        .labelStyle(.titleAndIcon)
-                }
-                .buttonStyle(.bordered)
-            }
-
-            HStack {
-                Image(systemName: "magnifyingglass")
-                TextField("Buscar por nombre o ventanilla", text: $query)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                if query.isEmpty == false {
-                    Button {
-                        query = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemGray6)))
-
-            HStack {
-                Button {
-                    resetFiltros()
-                } label: {
-                    Label("Reiniciar filtros", systemImage: "arrow.counterclockwise")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                Spacer(minLength: 0)
-            }
+            cerrada = estadoDe(vent: ventanilla)
+            empleadoSel = asignados[ventanilla] ?? empleadoSel
+        } catch {
+            print("No se pudo leer ACVState:", error)
         }
-        .padding(.horizontal)
-    }
-
-    private func chip(texto: String) -> some View {
-        HStack(spacing: 8) {
-            Text(texto)
-                .font(.callout.weight(.semibold))
-            Image(systemName: "chevron.down")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemGray6)))
-    }
-
-    private func resetFiltros() {
-        filtroVentanilla = nil
-        filtroEmpleadoId = nil
-        filtroEstado = .todas
-        query = ""
-        sortKey = .ventanilla
-        ascending = true
     }
 }
