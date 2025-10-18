@@ -14,6 +14,9 @@ struct EstadisticaVentanillaView: View {
     @State private var turnosAvg: [Turno24AverageHour] = []
     @State private var ventanillasAvailable: [VentanillaStatus] = []
     
+    @State private var ventanillasAvgTimes: [VentAvgTimes] = []
+    @State private var empleadoAvgTimes: [EmpAvgTimes] = []
+    
     
     @EnvironmentObject var store: CitasStore   // Para render en canvas
     
@@ -136,7 +139,7 @@ struct EstadisticaVentanillaView: View {
             .chartLegend(.visible)
             .frame(height: 300)
             .padding(.horizontal, 10)
-            
+        
             // Service and Wait Times Graph
             VStack(alignment: .leading, spacing: 8) {
                 Text("Duración Promedio de Espera vs Servicio")
@@ -200,17 +203,21 @@ struct EstadisticaVentanillaView: View {
                 turnos = try await fetchTurnos24ComparisonItem()
                 turnosAvg = try await fetchTurno24AverageHour()
                 ventanillasAvailable = try await fetchVentanillasStatus()
+
+                ventanillasAvgTimes = try await fetchVentAvgTimes()
+                empleadoAvgTimes = try await fetchEmpAvgTimes()
                 
             
                 print("Ventanillas cargadas:", ventanillasAvailable.count)
                 print("Turnos loaded:", turnos.count)
                 print("Avgs SERVICED & WAITTIME", turnosAvg)
                 print("Turnos PAST & FUTURE:", turnos)
+                print("VentanillasAvgTimes: ", ventanillasAvgTimes)
+                print("empleadoAvgTimes: ", empleadoAvgTimes)
             } catch {
                 print("Error fetching data:", error)
             }
         }
-
     }
 }
 

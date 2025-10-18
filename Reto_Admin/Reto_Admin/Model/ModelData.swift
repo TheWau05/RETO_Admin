@@ -168,6 +168,56 @@ struct VentanillaStatus: Codable, Identifiable {
     }
 }
 
+// MARK: - For /stats/employees/avg-times
+struct EmpAvgTimes: Codable, Identifiable {
+    let id: Int
+    let avgServiceMinutes: Double
+    let avgWaitMinutes: Double
+    let empleadoNombre: String
+
+    enum CodingKeys: String, CodingKey {
+        case id = "Emp_Id"
+        case avgServiceMinutes = "AvgServiceMinutes"
+        case avgWaitMinutes = "AvgWaitMinutes"
+        case empleadoNombre = "EmpleadoNombre"
+    }
+    
+    init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(Int.self, forKey: .id)
+            empleadoNombre = try container.decode(String.self, forKey: .empleadoNombre)
+            
+            // Convert string to Double safely
+            let serviceStr = try container.decode(String.self, forKey: .avgServiceMinutes)
+            let waitStr = try container.decode(String.self, forKey: .avgWaitMinutes)
+            avgServiceMinutes = Double(serviceStr) ?? 0.0
+            avgWaitMinutes = Double(waitStr) ?? 0.0
+        }
+}
+
+// MARK: - For /stats/ventanillas/avg-times
+struct VentAvgTimes: Codable, Identifiable {
+    let id: Int
+    let avgServiceMinutes: Double
+    let avgWaitMinutes: Double
+
+    enum CodingKeys: String, CodingKey {
+        case id = "Ventanilla_Id"
+        case avgServiceMinutes = "AvgServiceMinutes"
+        case avgWaitMinutes = "AvgWaitMinutes"
+    }
+    
+    init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(Int.self, forKey: .id)
+            
+            let serviceStr = try container.decode(String.self, forKey: .avgServiceMinutes)
+            let waitStr = try container.decode(String.self, forKey: .avgWaitMinutes)
+            avgServiceMinutes = Double(serviceStr) ?? 0.0
+            avgWaitMinutes = Double(waitStr) ?? 0.0
+        }
+}
+
 // Función para darle formato a la hora
 let rfc1123Formatter: DateFormatter = {
     let formatter = DateFormatter()
@@ -211,6 +261,28 @@ func fetchVentanillasStatus() async throws -> [VentanillaStatus] {
     let (data, _) = try await URLSession.shared.data(from: url)
     let decoder = JSONDecoder()
     return try decoder.decode([VentanillaStatus].self, from: data)
+}
+
+// MARK: - Función para traer tiempos promedio por empleado desde la API
+func fetchEmpAvgTimes() async throws -> [EmpAvgTimes] {
+    guard let url = URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206/stats/employees/avg-times") else {
+        throw URLError(.badURL)
+    }
+    
+    let (data, _) = try await URLSession.shared.data(from: url)
+    let decoder = JSONDecoder()
+    return try decoder.decode([EmpAvgTimes].self, from: data)
+}
+
+// MARK: - Función para traer tiempos promedio por ventanillas desde la API
+func fetchVentAvgTimes() async throws -> [VentAvgTimes] {
+    guard let url = URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206/stats/ventanillas/avg-times") else {
+        throw URLError(.badURL)
+    }
+    
+    let (data, _) = try await URLSession.shared.data(from: url)
+    let decoder = JSONDecoder()
+    return try decoder.decode([VentAvgTimes].self, from: data)
 }
 
 // Crear estructura para acomodar turnos en bins
