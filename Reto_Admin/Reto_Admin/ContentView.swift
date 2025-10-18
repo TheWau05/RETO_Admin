@@ -18,25 +18,32 @@ struct ContentView: View {
         TabView(selection: $router.selected) {
 
             NavigationStack(path: $router.dashboardPath) {
-                DashboardAdminView() // <- sin API
+                DashboardAdminView()
             }
             .tabItem { Label("Inicio", systemImage: "square.grid.2x2.fill") }
             .tag(AdminTab.dashboard)
 
             NavigationStack(path: $router.abrirCerrarPath) {
-                AbrirCerrarVentanillaPadView(api: apiContainer.client) // <- única que usa API real
+                AbrirCerrarVentanillaPadView(api: apiContainer.client)
             }
             .tabItem { Label("Abrir Cerrar", systemImage: "rectangle.portrait.on.rectangle.portrait") }
             .tag(AdminTab.abrirCerrar)
 
             NavigationStack(path: $router.historialPath) {
-                HistorialAdminView() // <- visual
+                HistorialAdminView()
             }
             .tabItem { Label("Historial", systemImage: "list.bullet.rectangle") }
             .tag(AdminTab.historial)
+            
+            NavigationStack(path: $router.rendimientoPath) {
+                RendimientoEmpleadoView()
+            }
+            .tabItem { Label("Rendimiento", systemImage: "person.text.rectangle") }
+            .tag(AdminTab.rendimiento)
+            // ------------------------------------
 
             NavigationStack(path: $router.estadisticaPath) {
-                EstadisticaVentanillaView() // <- visual
+                EstadisticaVentanillaView()
             }
             .tabItem { Label("Estadistica", systemImage: "gearshape") }
             .tag(AdminTab.estadistica)

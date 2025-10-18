@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-enum AdminTab: Hashable { case dashboard, abrirCerrar, historial, estadistica }
+enum AdminTab: Hashable { case dashboard, abrirCerrar, historial, rendimiento, estadistica }
 enum AdminRoute: Hashable { case detalleHistorial(id: String) }
 
 final class AdminRouter: ObservableObject {
@@ -17,6 +17,7 @@ final class AdminRouter: ObservableObject {
     @Published var dashboardPath = NavigationPath()
     @Published var abrirCerrarPath = NavigationPath()
     @Published var historialPath = NavigationPath()
+    @Published var rendimientoPath = NavigationPath()
     @Published var estadisticaPath = NavigationPath()
 
     func push(_ route: AdminRoute, on tab: AdminTab) {
@@ -24,6 +25,7 @@ final class AdminRouter: ObservableObject {
         case .dashboard: dashboardPath.append(route)
         case .abrirCerrar: abrirCerrarPath.append(route)
         case .historial: historialPath.append(route)
+        case .rendimiento: rendimientoPath.append(route)
         case .estadistica: estadisticaPath.append(route)
         }
     }
@@ -33,6 +35,7 @@ final class AdminRouter: ObservableObject {
         case .dashboard: dashboardPath = NavigationPath()
         case .abrirCerrar: abrirCerrarPath = NavigationPath()
         case .historial: historialPath = NavigationPath()
+        case .rendimiento: rendimientoPath = NavigationPath()
         case .estadistica: estadisticaPath = NavigationPath()
         }
     }

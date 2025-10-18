@@ -167,3 +167,70 @@ func fetchHistorial(fecha: Date, ventanillaId: Int) async throws -> [HistorialUs
     // 4. Decodificamos el JSON en nuestro arreglo de [HistorialUs]
     return try decoder.decode([HistorialUs].self, from: data)
 }
+
+// Reporte de Desempeño
+
+// Para la lista de empleados que aparecerá en el Picker/Dropdown
+// NOTA: Asegúrate que las propiedades coincidan con el JSON de tu endpoint de empleados.
+// Por ahora, asumimos que se llamarán 'Id' y 'Name'.
+struct Empleado: Codable, Identifiable, Hashable {
+    let Id: Int
+    let Name: String
+    
+    // Esto es para que Swift sepa cómo identificar cada empleado en una lista
+    var id: Int { Id }
+}
+
+// Para el resumen (las tarjetas con los totales)
+struct PerformanceSummary: Codable {
+    let TotalTurnosAtendidos: Int
+    let TiempoPromedioPorTurno: Int
+}
+
+// Para cada fila en la lista de detalles del historial
+struct PerformanceDetail: Codable, Identifiable {
+    let TurnoId: Int
+    let Start_Time: String
+    let End_Time: String
+    let Duracion_Minutos: Int
+    let Ventanilla_Id: Int
+    
+    // Hacemos que sea Identifiable para usarlo en un ForEach de SwiftUI
+    var id: Int { TurnoId }
+}
+
+// El objeto completo que agrupa el resumen y los detalles
+struct PerformanceReport: Codable {
+    let summary: PerformanceSummary
+    let details: [PerformanceDetail]
+}
+
+// Función para la Pantalla de Rendimiento
+
+func fetchPerformanceReport(employeeId: Int, startDate: Date, endDate: Date) async throws -> PerformanceReport {
+    // 1. Convertimos las fechas de Swift a un String en formato YYYY-MM-DD para la URL
+    let urlDateFormatter = DateFormatter()
+    urlDateFormatter.dateFormat = "yyyy-MM-dd"
+    let startDateString = urlDateFormatter.string(from: startDate)
+    let endDateString = urlDateFormatter.string(from: endDate)
+    
+    // 2. Construimos la URL con los parámetros correctos
+    let urlString = "https://los-cinco-informaticos.tc2007b.tec.mx:10206/employees/\(employeeId)/performance?startDate=\(startDateString)&endDate=\(endDateString)"
+    
+    guard let url = URL(string: urlString) else {
+        throw APIError.badURL // Usamos tu tipo de error personalizado
+    }
+    
+    // 3. Hacemos la llamada de red
+    let (data, response) = try await URLSession.shared.data(from: url)
+    
+    guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+        throw APIError.requestFailed((response as? HTTPURLResponse)?.statusCode ?? -1)
+    }
+    
+    // 4. Decodificamos el JSON en nuestro objeto PerformanceReport
+    // No necesitamos un formateador de fecha especial porque los recibimos como String
+    let decoder = JSONDecoder()
+    return try decoder.decode(PerformanceReport.self, from: data)
+}
+

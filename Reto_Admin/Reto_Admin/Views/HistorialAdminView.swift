@@ -2,14 +2,9 @@
 //  HistorialAdminView.swift
 //  Reto_Admin
 //
-//  Created by Alumno on 22/09/25.
-//
-//
-//  HistorialAdminView.swift
-//  Reto_Admin
-//
 //  Created by Oliver on 22/09/25.
 //
+
 import SwiftUI
 
 struct HistorialAdminView: View {
