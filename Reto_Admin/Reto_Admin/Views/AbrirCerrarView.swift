@@ -13,10 +13,10 @@
 
 import SwiftUI
 
-// 🔒 Clave en UserDefaults
+// MARK: - Persistencia (UserDefaults)
+
 private let kACVDefaultsKey = "AbrirCerrarVentanilla_State_v2"
 
-// 👤 Snapshot minimalista y 100% Codable para persistencia
 private struct EmployeeMini: Codable, Hashable {
     let id: Int
     let name: String
@@ -28,13 +28,14 @@ private struct ACVState: Codable {
     var ventanillaSeleccionada: Int = 1
 }
 
-// Helpers para mapear entre EmployeeBasic y EmployeeMini
 private extension EmployeeMini {
     init(from basic: EmployeeBasic) { self.init(id: basic.id, name: basic.name) }
 }
 private extension EmployeeBasic {
     init(from mini: EmployeeMini) { self.init(id: mini.id, name: mini.name) }
 }
+
+// MARK: - View
 
 struct AbrirCerrarVentanillaPadView: View {
     let api: AdminAPI
@@ -43,7 +44,7 @@ struct AbrirCerrarVentanillaPadView: View {
     @State private var cerrada = true
     @State private var empleados: [EmployeeBasic] = []
     @State private var empleadoSel: EmployeeBasic?
-    @State private var asignados: [Int: EmployeeBasic] = [:] // en RAM seguimos usando EmployeeBasic
+    @State private var asignados: [Int: EmployeeBasic] = [:]
     @State private var estados: [Int: Bool] = [:]
     @State private var loading = false
     @State private var sending = false
@@ -66,13 +67,19 @@ struct AbrirCerrarVentanillaPadView: View {
             .navigationTitle("Abrir / Cerrar Ventanilla")
             .navigationBarTitleDisplayMode(.inline)
             .tint(AdminColors.marca)
-            .task { await loadEmployees() }
-            .onAppear {
-                // 1) Trae estado guardado
+            .task {
+                // 1) Cargar lo que haya en local
                 loadPersistedState()
-                // 2) Sincroniza UI con ese estado
                 syncEstadoConSeleccion()
                 syncEmpleadoConVentanilla()
+
+                // 2) Intentar cargar empleados libres (no bloquea si falla)
+                await loadEmployees()
+
+                // 3) Si es un dispositivo nuevo (iPad) sin estado local, bootstrap desde backend
+                if asignados.isEmpty && estados.isEmpty {
+                    await bootstrapDesdeServidor()
+                }
             }
             .onChange(of: ventanilla) { _, _ in
                 syncEstadoConSeleccion()
@@ -81,6 +88,8 @@ struct AbrirCerrarVentanillaPadView: View {
             }
         }
     }
+
+    // MARK: - UI
 
     private func contentCard(width: CGFloat, height: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 44) {
@@ -178,7 +187,7 @@ struct AbrirCerrarVentanillaPadView: View {
                     ForEach(empleados) { e in
                         Button {
                             empleadoSel = e
-                            guardarEmpleadoActual() // guarda en RAM + persiste
+                            guardarEmpleadoActual() // RAM + persistencia
                         } label: {
                             HStack {
                                 Text(e.name)
@@ -200,9 +209,9 @@ struct AbrirCerrarVentanillaPadView: View {
                     .padding(.vertical, 18)
                     .padding(.horizontal, 20)
                     .background(RoundedRectangle(cornerRadius: 16).fill(Color(.systemGray6)))
-                    .contentShape(Rectangle())
+                    .contentShape(Rectangle()) // clicable todo el rectángulo
                 }
-                // importante: aunque la API no devuelva al asignado, si está persistido el botón sigue sirviendo
+                // Aunque la API no traiga al asignado, si está persistido el botón sigue sirviendo
                 .disabled(serviceDown)
                 .zIndex(2)
             }
@@ -234,7 +243,8 @@ struct AbrirCerrarVentanillaPadView: View {
         return Array(s).sorted()
     }
 
-    // MARK: - Carga de empleados
+    // MARK: - Datos
+
     private func loadEmployees() async {
         loading = true
         serviceDown = false
@@ -259,7 +269,47 @@ struct AbrirCerrarVentanillaPadView: View {
         }
     }
 
+    // Bootstrap inicial desde servidor (para iPad u otro dispositivo sin estado local)
+    @MainActor
+    private func bootstrapDesdeServidor() async {
+        do {
+            let server = try await fetchVentanillasStatus() // ya lo tienes definido en tu proyecto
+
+            var nuevosEstados: [Int: Bool] = [:]            // true=cerrada
+            var nuevosAsignados: [Int: EmployeeBasic] = [:]
+
+            for s in server {
+                let estaCerrada = !s.disponible
+                nuevosEstados[s.id] = estaCerrada
+
+                if let emp = s.empId {
+                    // Si no tienes el nombre, usa uno placeholder o agrega GET /employees/{id} para traerlo
+                    let nombre = asignados[s.id]?.name ?? "Empleado \(emp)"
+                    nuevosAsignados[s.id] = EmployeeBasic(id: emp, name: nombre)
+                }
+            }
+
+            estados = nuevosEstados
+            asignados = nuevosAsignados
+
+            // Ajustar selección actual
+            if let e = nuevosAsignados[ventanilla] {
+                empleadoSel = e
+            } else if empleadoSel == nil {
+                empleadoSel = empleados.first
+            }
+            cerrada = estadoDe(vent: ventanilla)
+
+            // Guardar para próximas aperturas en ese dispositivo
+            persistState()
+        } catch {
+            print("Bootstrap desde servidor falló: \(error)")
+            if empleadoSel == nil { empleadoSel = empleados.first }
+        }
+    }
+
     // MARK: - Estado en memoria
+
     private func estadoDe(vent: Int) -> Bool { estados[vent] ?? true } // true=cerrada por defecto
     private func setEstado(vent: Int, cerrada: Bool) { estados[vent] = cerrada }
     private func guardarEstadoActual() { setEstado(vent: ventanilla, cerrada: cerrada); persistState() }
@@ -281,6 +331,7 @@ struct AbrirCerrarVentanillaPadView: View {
     }
 
     // MARK: - Acciones
+
     private func onPrimaryButtonTap() async {
         if serviceDown { return }
         guard let empId = empleadoSel?.id else { return }
@@ -309,7 +360,8 @@ struct AbrirCerrarVentanillaPadView: View {
         }
     }
 
-    // MARK: - Persistencia (UserDefaults) usando EmployeeMini
+    // MARK: - Persistencia
+
     private func persistState() {
         var snapshot = ACVState(
             asignados: asignados.mapValues { EmployeeMini(from: $0) },
@@ -334,11 +386,8 @@ struct AbrirCerrarVentanillaPadView: View {
             estados    = snapshot.estados
             ventanilla = snapshot.ventanillaSeleccionada
 
-            // reconstruimos EmployeeBasic desde minis
             var asign: [Int: EmployeeBasic] = [:]
-            for (k, v) in snapshot.asignados {
-                asign[k] = EmployeeBasic(from: v)
-            }
+            for (k, v) in snapshot.asignados { asign[k] = EmployeeBasic(from: v) }
             asignados = asign
 
             cerrada = estadoDe(vent: ventanilla)

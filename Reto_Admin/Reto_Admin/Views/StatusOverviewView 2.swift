@@ -43,7 +43,6 @@ struct StatusOverviewView: View {
         NavigationStack {
             VStack(spacing: 16) {
 
-                // Selector de estado simple
                 Picker("Estado", selection: $filtroEstado) {
                     ForEach(EstadoFiltro.allCases) { s in
                         Text(s.rawValue).tag(s)
@@ -52,7 +51,6 @@ struct StatusOverviewView: View {
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
 
-                // Buscador
                 HStack {
                     Image(systemName: "magnifyingglass")
                     TextField("Buscar por nombre o ventanilla", text: $query)
