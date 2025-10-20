@@ -40,7 +40,6 @@ struct ContentView: View {
             }
             .tabItem { Label("Rendimiento", systemImage: "person.text.rectangle") }
             .tag(AdminTab.rendimiento)
-            // ------------------------------------
 
             NavigationStack(path: $router.estadisticaPath) {
                 EstadisticaVentanillaView()
@@ -52,5 +51,7 @@ struct ContentView: View {
         .environmentObject(router)
         .environmentObject(admin)
         .onChange(of: router.selected) { router.popToRoot($0) }
+
+        .globalExecutiveBot()
     }
 }
