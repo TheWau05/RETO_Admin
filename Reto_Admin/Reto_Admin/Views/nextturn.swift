@@ -108,6 +108,8 @@ fileprivate let uiDateFormatter: DateFormatter = {
     return f
 }()
 
+//UI
+
 // Column header
 private struct RecordHeader: View {
     var body: some View {
