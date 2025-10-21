@@ -11,11 +11,11 @@ struct HistorialAdminView: View {
     @State private var historial: [HistorialUs] = []
     @State private var isLoading = false
     
-    @State private var ventanillaSeleccionada = 1
     @State private var fechaSeleccionada = Date()
     
-    private let opcionesVentanilla = [1, 2, 3, 4]
-    
+    @State private var ventanillas: [NumVentanilla] = []
+    @State private var ventanillaSeleccionada: Int?
+
     var body: some View {
         ZStack {
             Color(.systemGray6).ignoresSafeArea()
@@ -32,13 +32,18 @@ struct HistorialAdminView: View {
                     Text("Filtros").font(.headline)
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Ventanilla").font(.subheadline).foregroundStyle(.secondary)
-                        Picker("Ventanilla", selection: $ventanillaSeleccionada) {
-                            ForEach(opcionesVentanilla, id: \.self) { n in
-                                Text("Ventanilla \(n)").tag(n)
+                        
+                        Picker("Seleccionar ventanilla", selection: $ventanillaSeleccionada) {
+                            Text("Seleccionar ventanilla").tag(Int?.none)
+                            ForEach(ventanillas) { v in
+                                Text("Ventanilla \(v.Id)").tag(v.Id as Int?)
                             }
                         }
-                        .pickerStyle(.segmented)
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color(.systemGray5)))
                     }
+
                     
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Fecha").font(.subheadline).foregroundStyle(.secondary)
@@ -93,18 +98,48 @@ struct HistorialAdminView: View {
         .task {
             await cargarDatos()
         }
+        .task {
+            await cargarVentanillas()
+        }
+
     }
     
     func cargarDatos() async {
         isLoading = true
+        defer { isLoading = false } // para asegurar que se apague el loading siempre
+        
+        guard let ventId = ventanillaSeleccionada else {
+            historial = []
+            return
+        }
+        
         do {
-            historial = try await fetchHistorial(fecha: fechaSeleccionada, ventanillaId: ventanillaSeleccionada)
+            historial = try await fetchHistorial(fecha: fechaSeleccionada, ventanillaId: ventId)
         } catch {
             print("Error al cargar historial: \(error)")
             historial = []
         }
-        isLoading = false
     }
+
+    
+    func cargarVentanillas() async {
+        do {
+            ventanillas = try await fetchAllVentanillas()
+            
+            // Selecciona automáticamente la primera ventanilla si no hay una elegida
+            if ventanillaSeleccionada == nil, let primera = ventanillas.first {
+                ventanillaSeleccionada = primera.Id
+            }
+            
+            // Carga el historial de esa ventanilla
+            if let ventId = ventanillaSeleccionada {
+                historial = try await fetchHistorial(fecha: fechaSeleccionada, ventanillaId: ventId)
+            }
+        } catch {
+            print("Error al cargar ventanillas: \(error)")
+        }
+    }
+
 }
 
 #if DEBUG
