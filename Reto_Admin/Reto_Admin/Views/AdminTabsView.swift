@@ -21,7 +21,6 @@ struct AdminTabsView: View {
     var body: some View {
         ZStack {
             if loggedIn {
-                // ✅ Solo muestra las tabs si está logueado
                 TabView(selection: $router.selected) {
                     
                     NavigationStack(path: $router.abrirCerrarPath) {

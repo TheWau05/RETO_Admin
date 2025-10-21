@@ -43,13 +43,13 @@ private struct StatusBadge: View {
     private var color: Color {
         switch state {
         case .available: return .green
-        case .locked:    return .orange
+        case .locked: return .orange
         }
     }
     private var systemImage: String {
         switch state {
         case .available: return "checkmark.circle.fill"
-        case .locked:    return "lock.fill"
+        case .locked: return "lock.fill"
         }
     }
 
@@ -87,9 +87,7 @@ struct TurnoRapidoAdminView: View {
     let idempleado: Int
     let permisos: String
     let api: any AdminAPI
-
     private let service = ServicioTurnoAdmin()
-
     @State private var turnoId: Int? = nil
     @State private var ventanillaId: Int? = nil
     @State private var cargando = false
@@ -105,7 +103,7 @@ struct TurnoRapidoAdminView: View {
     private var tituloEstado: String {
         switch visualState {
         case .available: return "Disponible"
-        case .locked:    return "No disponible"
+        case .locked: return "No disponible"
         }
     }
 
@@ -139,7 +137,6 @@ struct TurnoRapidoAdminView: View {
                     }
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-
                     if let v = ventanillaId ?? loadVentanillaFromSnapshot().vent {
                         VentChip(text: "Ventanilla \(v)")
                     } else {
@@ -151,13 +148,10 @@ struct TurnoRapidoAdminView: View {
                                 .foregroundStyle(Color.orange)
                         }
                     }
-
                     StatusBadge(state: visualState)
-
                     Text(tituloEstado)
                         .font(.system(size: 44, weight: .bold, design: .rounded))
                         .foregroundStyle(.primary)
-
                     Button { Task { await toggleTurno() } } label: {
                         Text(turnoId == nil ? "Empezar turno" : "Finalizar turno")
                             .font(.system(size: 30, weight: .bold, design: .rounded))
@@ -169,7 +163,6 @@ struct TurnoRapidoAdminView: View {
                     }
                     .disabled(cargando || (turnoId == nil && !puedeEmpezar))
                     .opacity(cargando ? 0.6 : 1)
-
                     Button {
                         onPressFinish()
                     } label: {
@@ -182,7 +175,6 @@ struct TurnoRapidoAdminView: View {
                     }
                     .disabled(cargando || (ventanillaId ?? loadVentanillaFromSnapshot().vent) == nil)
                     .sheet(isPresented: $showFinishSheet) { finishSheet }
-
                     Group {
                         if let v = ventanillaId ?? loadVentanillaFromSnapshot().vent {
                             if let t = turnoId {
@@ -198,15 +190,15 @@ struct TurnoRapidoAdminView: View {
                     }
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(.secondary)
-
-                    VStack(alignment: .trailing) {
-                        BotonSalirSesion(loggedIn: $loggedIn)
-                        Spacer()
-                        
+                    HStack {
+                        Button(action: { activeAlert = .salir }) {
+                            Image(systemName: "rectangle.portrait.and.arrow.forward.fill")
+                                .font(.system(size: 26, weight: .semibold))
+                                .foregroundColor(.red)
+                                .padding()
+                        }
                     }
-
                     if cargando { ProgressView().scaleEffect(1.4) }
-
                     Spacer(minLength: 40)
                 }
                 .padding(.horizontal, 60)
@@ -260,12 +252,10 @@ struct TurnoRapidoAdminView: View {
                 Text("Si el turno quedó atorado en el servidor, ingresa el **turno_id** para liberar la ventanilla.")
                     .font(.subheadline).foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-
                 TextField("turno_id", text: $finishTurnoIdText)
                     .keyboardType(.numberPad)
                     .textFieldStyle(.roundedBorder)
                     .padding(.horizontal)
-
                 Button {
                     Task { await finishManual() }
                 } label: {
@@ -277,7 +267,6 @@ struct TurnoRapidoAdminView: View {
                         .foregroundStyle(.white)
                 }
                 .padding(.horizontal)
-
                 Spacer()
             }
             .padding()

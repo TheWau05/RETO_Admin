@@ -70,7 +70,6 @@ struct StatusOverviewView: View {
                 .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemGray6)))
                 .padding(.horizontal)
 
-                // Botón reiniciar filtros
                 Button {
                     filtroEstado = .todas
                     query = ""
@@ -81,7 +80,6 @@ struct StatusOverviewView: View {
                 .buttonStyle(.bordered)
                 .padding(.horizontal)
 
-                // Lista principal
                 List {
                     ForEach(listaFiltrada, id: \.self) { v in
                         HStack(spacing: 16) {

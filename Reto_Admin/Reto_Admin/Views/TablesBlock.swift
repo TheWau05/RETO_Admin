@@ -8,12 +8,10 @@
 import SwiftUI
 import UIKit
 
-// MARK: - TablesBlock (full-width table)
 struct TablesBlock: View {
     private let ventHeaders = ["Número de Ventanilla", "Tiempo en Servicio", "Tiempo de Espera"]
     private let empHeaders  = ["Empleado", "Tiempo en Servicio", "Tiempo de Espera"]
 
-    // Sample data (for testing)
     private let venRows: [[String]] = [
         ["1", "12", "5"],
         ["2", "10", "6"],
@@ -38,13 +36,11 @@ struct TablesBlock: View {
     }
 }
 
-// MARK: - Card container (kept simple to avoid type-check blowups)
 private struct TableCard: View {
     let title: String
     let headers: [String]
     let rows: [[String]]
 
-    // Equal, flexible columns across available width
     private var cols: [GridItem] {
         Array(repeating: .init(.flexible(minimum: 60), spacing: 0), count: headers.count)
     }
@@ -83,7 +79,6 @@ private struct TableCard: View {
     }
 }
 
-// MARK: - Header grid
 private struct HeaderGrid: View {
     let headers: [String]
     let cols: [GridItem]
@@ -118,7 +113,6 @@ private struct HeaderCell: View {
     }
 }
 
-// MARK: - Data rows
 private struct RowGrid: View {
     let values: [String]
     let headersCount: Int
@@ -152,7 +146,6 @@ private struct DataCell: View {
     }
 }
 
-// MARK: - Empty state
 private struct EmptyRowView: View {
     let colCount: Int
     var body: some View {

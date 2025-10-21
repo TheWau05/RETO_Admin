@@ -72,7 +72,6 @@ struct nextturnView: View {
                 .ignoresSafeArea()
 
                 VStack(alignment: .leading, spacing: 24) {
-                    // (Opcional) útil para depurar sesión
                     HStack(spacing: 12) {
                         Label("ID: \(idempleado)", systemImage: "person")
                         Label(permisos, systemImage: "key.fill")

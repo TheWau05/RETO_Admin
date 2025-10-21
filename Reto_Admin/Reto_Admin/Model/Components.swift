@@ -224,7 +224,6 @@ struct DataTable: View {
     }
 }
 
-// Header de página uniforme 
 struct PageHeader<Trailing: View>: View {
     var title: String
     @ViewBuilder var trailing: () -> Trailing
