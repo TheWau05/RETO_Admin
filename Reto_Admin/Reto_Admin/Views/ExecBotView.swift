@@ -126,7 +126,6 @@ struct GlobalExecutiveBot: ViewModifier {
             VStack {
                 Spacer()
                 HStack {
-                    Spacer()
                     Button {
                         hub.isPresented = true
                     } label: {
@@ -138,8 +137,9 @@ struct GlobalExecutiveBot: ViewModifier {
                             .shadow(radius: 8)
                     }
                     .accessibilityLabel("Resumen Ejecutivo")
-                    .padding(.trailing, 22)
+                    .padding(.leading, 22)
                     .padding(.bottom, 22)
+                    Spacer()
                 }
             }
         }
