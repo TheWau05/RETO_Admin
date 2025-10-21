@@ -104,7 +104,7 @@ struct HistorialAdminView: View {
     
     func cargarDatos() async {
         isLoading = true
-        defer { isLoading = false } /
+        defer { isLoading = false }
         
         guard let ventId = ventanillaSeleccionada else {
             historial = []

@@ -46,7 +46,7 @@ struct EstadisticaVentanillaView: View {
         }
     }
     
-z    private var binnedAverages: [TurnosAverageBin] {
+    private var binnedAverages: [TurnosAverageBin] {
         turnosAvg.flatMap { item in
             let hour = Calendar.current.component(.hour, from: item.hourStart)
             return [
