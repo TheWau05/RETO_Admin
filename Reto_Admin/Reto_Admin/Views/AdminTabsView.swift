@@ -25,7 +25,7 @@ struct AdminTabsView: View {
                 TabView(selection: $router.selected) {
                     
                     NavigationStack(path: $router.abrirCerrarPath) {
-                        AbrirCerrarVentanillaPadView(api: apiContainer.client)
+                        AbrirCerrarVentanillaPadView(api: apiContainer.client, loggedIn: $loggedIn)
                     }
                     .tabItem { Label("Abrir/Cerrar", systemImage: "rectangle.portrait.on.rectangle.portrait") }
                     .tag(AdminTab.abrirCerrar)

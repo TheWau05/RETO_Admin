@@ -156,7 +156,6 @@ final class ReporteService {
             } catch {
                 last = error
                 let ns = error as NSError
-                // Reintentos para timeouts / conexión / resets
                 let transient = [NSURLErrorTimedOut, NSURLErrorNetworkConnectionLost, NSURLErrorCannotConnectToHost, NSURLErrorCannotFindHost]
                 if attempt < retries && (transient.contains(ns.code) || ns.localizedDescription.localizedCaseInsensitiveContains("reset")) {
                     try await Task.sleep(nanoseconds: UInt64(300_000_000 * (attempt + 1)))

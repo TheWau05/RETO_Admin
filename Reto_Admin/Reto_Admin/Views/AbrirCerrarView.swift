@@ -36,6 +36,7 @@ private extension EmployeeBasic {
 struct AbrirCerrarVentanillaPadView: View {
     let api: AdminAPI
 
+    @Binding var loggedIn: Bool
     @State private var ventanilla = 1
     @State private var cerrada = true
     @State private var empleados: [EmployeeBasic] = []
@@ -61,6 +62,10 @@ struct AbrirCerrarVentanillaPadView: View {
                         Spacer(minLength: 40)
                         contentCard(width: geo.size.width * 0.9, height: geo.size.height * 0.65)
                         Spacer(minLength: 60)
+                        VStack(alignment: .trailing) {
+                            BotonSalirSesion(loggedIn: $loggedIn)
+                        }
+
                     }
                     .frame(width: geo.size.width, height: geo.size.height)
                 }
@@ -77,6 +82,8 @@ struct AbrirCerrarVentanillaPadView: View {
                     await bootstrapDesdeServidor()
                 }
             }
+                        
+
             .onChange(of: ventanilla) { _, _ in
                 syncEstadoConSeleccion()
                 syncEmpleadoConVentanilla()
@@ -113,7 +120,7 @@ struct AbrirCerrarVentanillaPadView: View {
                     Text("Ver estatus y asignaciones")
                         .font(.system(size: 20, weight: .semibold))
                 }
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, alignment: .trailing)
                 .padding(.vertical, 16)
                 .background(AdminColors.marca.opacity(0.12))
                 .foregroundStyle(AdminColors.marca)
@@ -167,6 +174,7 @@ struct AbrirCerrarVentanillaPadView: View {
                     }
                     .frame(maxWidth: 240)
                     .padding(.top, 6)
+                    
                 }
 
                 Spacer()

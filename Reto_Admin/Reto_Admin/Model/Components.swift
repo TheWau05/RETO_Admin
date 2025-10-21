@@ -284,3 +284,34 @@ struct BotonPrincipal: View {
         .tint(Color.marca)
     }
 }
+
+struct BotonSalirSesion: View {
+    @Binding var loggedIn: Bool
+    @EnvironmentObject var router: AdminRouter
+    @State private var showAlert = false
+
+    var body: some View {
+        HStack {
+            Spacer()
+            Button(action: { showAlert = true }) {
+                Image(systemName: "rectangle.portrait.and.arrow.forward.fill")
+                    .font(.system(size: 32, weight: .bold))
+                    .accessibilityLabel("Cerrar sesión")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .tint(Color.marca)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .alert("¿Seguro?", isPresented: $showAlert) {
+            Button("Continuar", role: .destructive) {
+                loggedIn = false
+                router.selected = .inicio
+                router.popToRoot(.inicio)
+            }
+            Button("Cancelar", role: .cancel) { }
+        } message: {
+            Text("¿Quieres cerrar tu sesión?")
+        }
+    }
+}

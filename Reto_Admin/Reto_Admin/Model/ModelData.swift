@@ -22,28 +22,6 @@ struct EventoVentanilla: Identifiable, Hashable {
     let accion: String
 }
 
-struct HistorialAdmin: Identifiable {
-    var id: UUID = .init()
-    var ventanillaID: Int
-    var idReceta: String
-    var horaAtencion: Date
-}
-
-func obtenerHistorial() -> [HistorialAdmin] {
-    [
-        HistorialAdmin(ventanillaID: 1, idReceta: "REC-98765", horaAtencion: Date()),
-        HistorialAdmin(ventanillaID: 2, idReceta: "REC-98766", horaAtencion: Date().addingTimeInterval(-1800)),
-        HistorialAdmin(ventanillaID: 2, idReceta: "REC-98767", horaAtencion: Date().addingTimeInterval(-3600)),
-        HistorialAdmin(ventanillaID: 3, idReceta: "REC-98768", horaAtencion: Date().addingTimeInterval(-5400)),
-        HistorialAdmin(ventanillaID: 3, idReceta: "REC-98769", horaAtencion: Date().addingTimeInterval(-7200)),
-        HistorialAdmin(ventanillaID: 3, idReceta: "REC-98755", horaAtencion: Date().addingTimeInterval(-86400)),
-        HistorialAdmin(ventanillaID: 1, idReceta: "REC-98750", horaAtencion: Date().addingTimeInterval(-90000)),
-    ]
-}
-
-var historialDeVentanilla: [HistorialAdmin] = obtenerHistorial()
-
-
 final class AdminManager: ObservableObject {
     @Published var ventanillas: [Ventanilla] = [
         .init(nombre: "Ventanilla 1", abierta: true),
