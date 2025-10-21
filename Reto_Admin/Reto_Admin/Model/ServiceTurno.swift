@@ -6,22 +6,32 @@
 //
 import Foundation
 
-// ====== Modelos mínimos para leer el snapshot guardado por Abrir/Cerrar ======
-private struct EmployeeMini: Codable, Hashable {
-    let id: Int
-    let name: String
-}
+// MARK: - Snapshot guardado por Abrir/Cerrar (UserDefaults)
+private struct EmployeeMiniSnap: Codable, Hashable { let id: Int; let name: String }
 private struct ACVStateSnapshot: Codable {
-    var asignados: [Int: EmployeeMini] = [:] // ventanilla -> empleado
-    var estados:   [Int: Bool] = [:]         // ventanilla -> cerrada(true)/abierta(false)
+    var asignados: [Int: EmployeeMiniSnap] = [:]  // ventanilla -> empleado
+    var estados:   [Int: Bool] = [:]              // ventanilla -> cerrada(true)/abierta(false)
     var ventanillaSeleccionada: Int = 1
 }
 private let kACVDefaultsKey = "AbrirCerrarVentanilla_State_v2"
 
-// ====== Servicio Turno ======
+private func loadContextFromSnapshot() -> (ventId: Int?, empId: Int?) {
+    guard let data = UserDefaults.standard.data(forKey: kACVDefaultsKey),
+          let snap = try? JSONDecoder().decode(ACVStateSnapshot.self, from: data) else {
+        return (nil, nil)
+    }
+    let vent = snap.ventanillaSeleccionada
+    let emp  = snap.asignados[vent]?.id
+    return (vent, emp)
+}
+
+// MARK: - ServicioTurnoAdmin
 final class ServicioTurnoAdmin {
 
+    // Ajusta si cambia tu host/base
     private let base = URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206")!
+
+    // Cache local de turno activo
     private let keyTurno      = "turno_cache_id_v1"
     private let keyVentanilla = "turno_cache_vent_v1"
 
@@ -33,19 +43,7 @@ final class ServicioTurnoAdmin {
         return URLSession(configuration: cfg)
     }()
 
-    // MARK: - Contexto desde Abrir/Cerrar
-    /// Lee de UserDefaults la ventanilla seleccionada y el empleado asignado a esa ventanilla.
-    private func loadContextFromAbrirCerrar() -> (ventId: Int?, empId: Int?) {
-        guard let data = UserDefaults.standard.data(forKey: kACVDefaultsKey),
-              let snap = try? JSONDecoder().decode(ACVStateSnapshot.self, from: data) else {
-            return (nil, nil)
-        }
-        let v = snap.ventanillaSeleccionada
-        let e = snap.asignados[v]?.id
-        return (v, e)
-    }
-
-    // MARK: - Cache local de turno activo
+    // MARK: - Cache helpers
     func loadCached() -> (turno: Int?, ventanilla: Int?) {
         (UserDefaults.standard.object(forKey: keyTurno) as? Int,
          UserDefaults.standard.object(forKey: keyVentanilla) as? Int)
@@ -59,17 +57,14 @@ final class ServicioTurnoAdmin {
         UserDefaults.standard.removeObject(forKey: keyVentanilla)
     }
 
-    // MARK: - API
-
-    /// POST /service/start
-    /// Body esperado (según tus mensajes del backend):
-    /// { "ventanilla_id": Int, "emp_id": Int? }
+    // MARK: - Start
+    /// Llama POST /service/start con { "ventanilla_id": Int, "emp_id": Int? }
+    /// Devuelve (turno_id, ventanilla_id)
     func startService() async throws -> (turnoId: Int, ventanillaId: Int) {
-        let ctx = loadContextFromAbrirCerrar()
+        let ctx = loadContextFromSnapshot()
         guard let ventId = ctx.ventId else {
             throw NSError(domain: "CTX", code: -1, userInfo: [
-                NSLocalizedDescriptionKey:
-                    "No hay ventanilla seleccionada. Abre la pestaña 'Abrir Cerrar' y selecciona una ventanilla/empleado."
+                NSLocalizedDescriptionKey: "No hay ventanilla seleccionada. Abre la pestaña “Abrir Cerrar” y configúrala."
             ])
         }
 
@@ -79,7 +74,9 @@ final class ServicioTurnoAdmin {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         var body: [String: Any] = ["ventanilla_id": ventId]
-        if let empId = ctx.empId { body["emp_id"] = empId } // opcional si el backend lo usa
+        // Si tu backend lo espera/usa, lo mandamos. Si no, lo ignora.
+        if let emp = ctx.empId { body["emp_id"] = emp }
+
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, resp) = try await session.data(for: req)
@@ -89,29 +86,42 @@ final class ServicioTurnoAdmin {
             throw NSError(domain: "HTTP", code: http.statusCode, userInfo: ["body": b])
         }
 
-        // Acepta varios formatos de respuesta
+        // Formatos tolerados:
+        // 1) {"assignments":[{"turno_id":5,"ventanilla_id":3}], "message":"..."}
+        // 2) {"turno_id":5,"ventanilla_id":3}
+        // 3) {"message":"La ventanilla X no está disponible..."} -> error legible
         if let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+
             if let msg = root["message"] as? String, !msg.isEmpty {
-                throw NSError(domain: "BACK", code: 0, userInfo: [NSLocalizedDescriptionKey: msg])
+                // si llega "success" textual no lo tratamos como error, solo si parece negativa
+                if msg.lowercased().contains("no está disponible")
+                    || msg.lowercased().contains("no existe")
+                    || msg.lowercased().contains("error") {
+                    throw NSError(domain: "BACK", code: 0, userInfo: [NSLocalizedDescriptionKey: msg])
+                }
             }
+
             if let arr = root["assignments"] as? [[String: Any]],
                let first = arr.first,
                let tid = first["turno_id"] as? Int,
                let vid = first["ventanilla_id"] as? Int {
                 return (tid, vid)
             }
-            if let tid = root["turno_id"] as? Int, let vid = root["ventanilla_id"] as? Int {
+
+            if let tid = root["turno_id"] as? Int,
+               let vid = root["ventanilla_id"] as? Int {
                 return (tid, vid)
             }
         }
+
         throw NSError(domain: "PARSE", code: -1,
                       userInfo: [NSLocalizedDescriptionKey: "Respuesta inesperada de /service/start"])
     }
 
-    /// POST /service/finish
-    /// Body esperado: { "turno_id": Int, "ventanilla_id": Int, "emp_id": Int? }
+    // MARK: - Finish
+    /// Llama POST /service/finish con { "turno_id": Int, "ventanilla_id": Int, "emp_id": Int? }
     func finishService(turnoId: Int, ventanillaId: Int) async throws {
-        let ctx = loadContextFromAbrirCerrar()
+        let ctx = loadContextFromSnapshot()
 
         var req = URLRequest(url: base.appendingPathComponent("/service/finish"))
         req.httpMethod = "POST"
@@ -122,7 +132,8 @@ final class ServicioTurnoAdmin {
             "turno_id": turnoId,
             "ventanilla_id": ventanillaId
         ]
-        if let empId = ctx.empId { body["emp_id"] = empId } // opcional si tu backend lo valida
+        if let emp = ctx.empId { body["emp_id"] = emp }
+
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, resp) = try await session.data(for: req)
@@ -132,6 +143,7 @@ final class ServicioTurnoAdmin {
             throw NSError(domain: "HTTP", code: http.statusCode, userInfo: ["body": b])
         }
 
+        // Si backend responde {"message":"error ..."} lo elevamos
         if let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let msg = root["message"] as? String,
            msg.lowercased().contains("error") {
