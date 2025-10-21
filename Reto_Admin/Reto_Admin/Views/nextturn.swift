@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-
 fileprivate let uiDateFormatter: DateFormatter = {
     let f = DateFormatter()
     f.dateStyle = .medium
@@ -31,7 +30,6 @@ private struct RecordHeader: View {
 
 private struct RecordRow: View {
     @Binding var record: Record
-
     var body: some View {
         HStack(spacing: 20) {
             Text("#\(record.id)")
@@ -62,7 +60,12 @@ private struct RecordRow: View {
     }
 }
 
+// ⬇️ AÑADIDO: parámetros que pasas desde EmpleadoTabView
 struct nextturnView: View {
+    let idempleado: Int
+    let permisos: String
+    let api: any AdminAPI   // coincide con apiContainer.client
+
     @State private var records: [Record] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -77,6 +80,14 @@ struct nextturnView: View {
                 .ignoresSafeArea()
 
                 VStack(alignment: .leading, spacing: 24) {
+                    // (Opcional) útil para depurar sesión
+                    HStack(spacing: 12) {
+                        Label("ID: \(idempleado)", systemImage: "person")
+                        Label(permisos, systemImage: "key.fill")
+                    }
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+
                     Text("User Records")
                         .font(.system(size: 38, weight: .bold, design: .rounded))
 
@@ -108,14 +119,7 @@ struct nextturnView: View {
                     Button {
                         Task { await refresh() }
                     } label: {
-                        HStack(spacing: 8) {
-                            if isLoading {
-                                ProgressView()
-                                    .progressViewStyle(.circular)
-                            } else {
-                                Image(systemName: "arrow.clockwise")
-                            }
-                        }
+                        if isLoading { ProgressView() } else { Image(systemName: "arrow.clockwise") }
                     }
                     .disabled(isLoading)
                     .accessibilityLabel("Actualizar lista")
@@ -125,13 +129,14 @@ struct nextturnView: View {
         .task { await refresh() }
     }
 
-    
     private func refresh() async {
         guard !isLoading else { return }
         errorMessage = nil
         isLoading = true
         defer { isLoading = false }
         do {
+            // Si tu API requiere el empleado o client, úsalo aquí, p.ej.:
+            // records = try await TurnosAPI.fetchNext30(api: api, empleadoId: idempleado)
             records = try await TurnosAPI.fetchNext30()
         } catch {
             errorMessage = "Formato no válido o error de red: \(error.localizedDescription)"
@@ -140,5 +145,6 @@ struct nextturnView: View {
 }
 
 #Preview {
-    nextturnView()
+    // Preview con datos dummy
+    nextturnView(idempleado: 25, permisos: "Emp", api: MockAdminAPI())
 }

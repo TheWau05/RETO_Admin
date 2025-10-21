@@ -8,56 +8,21 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var apiContainer = APIContainer(
-        client: HTTPAdminAPI(baseURL: URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206")!)
-    )
-    @StateObject private var router = AdminRouter()
-    @StateObject private var admin = AdminManager()
-
+    @EnvironmentObject var router: AdminRouter
+    
+    @State private var loggedIn: Bool = false
+    @State private var idempleado: Int = 0
+    @State private var permisos: String = ""
+    
     var body: some View {
-        TabView(selection: $router.selected) {
-
-            NavigationStack(path: $router.dashboardPath) {
-                DashboardAdminView()
-            }
-            .tabItem { Label("Inicio", systemImage: "square.grid.2x2.fill") }
-            .tag(AdminTab.dashboard)
-
-            NavigationStack(path: $router.abrirCerrarPath) {
-                AbrirCerrarVentanillaPadView(api: apiContainer.client)
-            }
-            .tabItem { Label("Abrir Cerrar", systemImage: "rectangle.portrait.on.rectangle.portrait") }
-            .tag(AdminTab.abrirCerrar)
-
-            NavigationStack(path: $router.historialPath) {
-                HistorialAdminView()
-            }
-            .tabItem { Label("Historial", systemImage: "list.bullet.rectangle") }
-            .tag(AdminTab.historial)
-
-            NavigationStack(path: $router.rendimientoPath) {
-                RendimientoEmpleadoView()
-            }
-            .tabItem { Label("Rendimiento", systemImage: "person.text.rectangle") }
-            .tag(AdminTab.rendimiento)
-
-            NavigationStack(path: $router.estadisticaPath) {
-                EstadisticaVentanillaView()
-            }
-            .tabItem { Label("Estadistica", systemImage: "gearshape") }
-            .tag(AdminTab.estadistica)
-
-            // 🟢 Nueva pestaña Turno Rápido
-            NavigationStack {
-                TurnoRapidoAdminView()
-            }
-            .tabItem { Label("Turno rápido", systemImage: "clock.arrow.circlepath") }
-            .tag(AdminTab.turnoRapido)
+        if permisos == "Admin" {
+            AdminTabsView(permisos: $permisos, idempleado: $idempleado, loggedIn: $loggedIn)
+        } else if permisos == "Emp" {
+            EmpleadoTabView(permisos: $permisos, idempleado: $idempleado, loggedIn: $loggedIn)
+        } else {
+            LoginAdminView(loggedIn: $loggedIn,
+                           idempleado: $idempleado,
+                           permisos: $permisos)
         }
-        .tint(AdminColors.marca)
-        .environmentObject(router)
-        .environmentObject(admin)
-        .onChange(of: router.selected) { router.popToRoot($0) }
-        .globalExecutiveBot()
     }
 }

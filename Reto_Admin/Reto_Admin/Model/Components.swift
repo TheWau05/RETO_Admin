@@ -270,3 +270,17 @@ struct TurnosChart: View {
         }
     }
 }
+
+struct BotonPrincipal: View {
+    var title: String
+    var action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            HStack { Text(title).font(.system(size: 24, weight: .bold)) }
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity, minHeight: 40)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(Color.marca)
+    }
+}

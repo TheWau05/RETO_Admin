@@ -9,9 +9,11 @@ import SwiftUI
 
 @main
 struct Reto_AdminApp: App {
+    @StateObject private var router = AdminRouter()
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(router)
         }
     }
 }

@@ -271,3 +271,48 @@ func formattedDate(from dateString: String) -> String {
     display.dateFormat = "d 'de' MMMM 'de' yyyy, HH:mm"
     return display.string(from: local)
 }
+
+struct UsuarioLogin: Codable {
+    let message: String
+    let username: String?
+    let permissions: String?
+    let empid: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case message
+        case username
+        case permissions
+        case empid
+    }
+}
+
+func fetchLogin(username: String, password: String) async throws -> UsuarioLogin {
+    guard let url = URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206/admin/auth/login") else {
+        throw URLError(.badURL)
+    }
+
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+    let body: [String: String] = ["username": username, "password": password]
+    request.httpBody = try JSONEncoder().encode(body)
+
+    let (data, response) = try await URLSession.shared.data(for: request)
+
+    guard let httpResponse = response as? HTTPURLResponse else {
+        throw URLError(.badServerResponse)
+    }
+
+    switch httpResponse.statusCode {
+    case 200:
+        return try JSONDecoder().decode(UsuarioLogin.self, from: data)
+    case 400:
+        throw NSError(domain: "", code: 400, userInfo: [NSLocalizedDescriptionKey: "Faltan campos requeridos"])
+    case 401:
+        throw NSError(domain: "", code: 401, userInfo: [NSLocalizedDescriptionKey: "Usuario o contraseña incorrectos"])
+    default:
+        throw NSError(domain: "", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Error inesperado"])
+    }
+}

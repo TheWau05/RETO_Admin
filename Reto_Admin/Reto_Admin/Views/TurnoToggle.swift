@@ -67,7 +67,6 @@ private struct StatusBadge: View {
                 .fill(color.opacity(0.18))
                 .frame(width: 260, height: 260)
                 .overlay(
-                    // pulso sutil cuando está bloqueado
                     Circle()
                         .stroke(color.opacity(0.5), lineWidth: 6)
                         .scaleEffect(pulse && state == .locked ? 1.08 : 1.0)
@@ -93,23 +92,26 @@ private struct StatusBadge: View {
 
 // MARK: - Vista principal
 struct TurnoRapidoAdminView: View {
-    @EnvironmentObject private var router: AdminRouter
+    @EnvironmentObject private var router: EmpleadoRouter
+    @State private var activeAlert: ActiveAlert?
+
+
+    let idempleado: Int
+    let permisos: String
+    let api: any AdminAPI
+
+    
     private let service = ServicioTurnoAdmin()
 
-    // Estado real
     @State private var turnoId: Int? = nil
     @State private var ventanillaId: Int? = nil
 
-    // Otros estados
     @State private var cargando = false
     @State private var errorMsg: String? = nil
-    @State private var lockedByBackend = false // “no está disponible” desde backend
-
-    // Manual finish
+    @State private var lockedByBackend = false
     @State private var showFinishSheet = false
     @State private var finishTurnoIdText = ""
 
-    // Derivados (SOLO 2 estados)
     private var isLocked: Bool { (turnoId != nil) || lockedByBackend }
     private var visualState: VisualState { isLocked ? .locked : .available }
 
@@ -122,11 +124,19 @@ struct TurnoRapidoAdminView: View {
     private var puedeEmpezar: Bool {
         return !isLocked && !cargando && (ventanillaId ?? loadVentanillaFromSnapshot().vent) != nil
     }
-    private var puedeFinalizar: Bool {
-        return (turnoId != nil) && !cargando
-    }
+    private var puedeFinalizar: Bool { (turnoId != nil) && !cargando }
     private var botonColor: Color { isLocked ? .orange : AdminColors.marca }
-
+    
+    enum ActiveAlert: Identifiable {
+        case salir
+        
+        var id: String {
+            switch self {
+            case .salir: return "salir"
+            }
+        }
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -134,13 +144,29 @@ struct TurnoRapidoAdminView: View {
 
                 VStack(spacing: 26) {
                     Spacer(minLength: 10)
+                    Button(action: { activeAlert = .salir }) {
+                        Image(systemName: "rectangle.portrait.and.arrow.forward.fill")
+                            .font(.system(size: 26, weight: .semibold))
+                            .foregroundColor(.red)
+                            .padding(.trailing, 24)
+                            .padding(.top, 12)
+                    }
+                
+
+                    // Info útil para depurar sesión (idempleado/permisos)
+                    HStack(spacing: 12) {
+                        Label("ID: \(idempleado)", systemImage: "person.crop.circle")
+                        Label(permisos, systemImage: "key.fill")
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
 
                     // Chip de ventanilla o CTA para configurarla
                     if let v = ventanillaId ?? loadVentanillaFromSnapshot().vent {
                         VentChip(text: "Ventanilla \(v)")
                     } else {
                         Button {
-                            router.switchTo(.abrirCerrar)
+                            router.switchTo(.abrircerrar)
                         } label: {
                             Label("Selecciona ventanilla en Abrir/Cerrar", systemImage: "exclamationmark.triangle.fill")
                                 .font(.system(size: 16, weight: .semibold))
@@ -150,7 +176,6 @@ struct TurnoRapidoAdminView: View {
                         }
                     }
 
-                    // Ícono grande (solo 2 estados)
                     StatusBadge(state: visualState)
 
                     // Título
@@ -340,12 +365,9 @@ struct TurnoRapidoAdminView: View {
             : e.localizedDescription
         errorMsg = msg
 
-        // Si backend dice “no está disponible”, bloquea (candado) aunque no tengamos turno_id
         if msg.localizedCaseInsensitiveContains("no está disponible")
             || msg.localizedCaseInsensitiveContains("not available") {
-            withAnimation(.spring()) {
-                lockedByBackend = true
-            }
+            withAnimation(.spring()) { lockedByBackend = true }
         }
     }
 }

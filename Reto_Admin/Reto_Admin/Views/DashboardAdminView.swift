@@ -79,8 +79,7 @@ final class ReporteService {
         return try parseExecutive(data: data)
     }
 
-    // POST ask/gemini
-    // Soporta ambos: { "prompt": "...", "ask": "..." }
+    
     func askGemini(prompt: String) async throws -> GeminiFlexible {
         var req = URLRequest(url: askURL)
         req.httpMethod = "POST"
@@ -256,10 +255,28 @@ final class PromptVM: ObservableObject {
     }
 }
 
-// MARK: - View
+
+import SwiftUI
+
 struct DashboardAdminView: View {
     @StateObject private var vm = PromptVM()
-
+    
+    // 🔹 Para manejar el cierre de sesión
+    @EnvironmentObject var router: AdminRouter
+    @Binding var loggedIn: Bool
+    @State private var activeAlert: ActiveAlert?
+    
+    // ✅ Conforma a Identifiable
+    enum ActiveAlert: Identifiable {
+        case salir
+        
+        var id: String {
+            switch self {
+            case .salir: return "salir"
+            }
+        }
+    }
+    
     var body: some View {
         ZStack {
             LinearGradient(colors: [Color(.systemGray6), Color(.systemGray5)],
@@ -268,14 +285,39 @@ struct DashboardAdminView: View {
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .overlay(content)
+        .alert(item: $activeAlert) { alert in
+            switch alert {
+            case .salir:
+                return Alert(
+                    title: Text("¿Seguro?"),
+                    message: Text("¿Quieres cerrar tu sesión?"),
+                    primaryButton: .destructive(Text("Continuar")) {
+                        loggedIn = false
+                        router.selected = .inicio
+                        router.popToRoot(.inicio)
+                    },
+                    secondaryButton: .cancel()
+                )
+            }
+        }
     }
-
+    
     @ViewBuilder
     private var content: some View {
         VStack(spacing: 22) {
-            Spacer()
-
-            // Barra + Lupita
+            // 🔹 Botón de cerrar sesión (arriba a la derecha)
+            HStack {
+                Spacer()
+                Button(action: { activeAlert = .salir }) {
+                    Image(systemName: "rectangle.portrait.and.arrow.forward.fill")
+                        .font(.system(size: 26, weight: .semibold))
+                        .foregroundColor(.red)
+                        .padding(.trailing, 24)
+                        .padding(.top, 12)
+                }
+            }
+            
+            // 🔹 Campo de texto y botón de búsqueda
             HStack {
                 TextField("Pregunta a Gemini o escribe: resumen | ventanillas | todo", text: $vm.prompt)
                     .textInputAutocapitalization(.never)
@@ -286,7 +328,7 @@ struct DashboardAdminView: View {
                     .padding(.vertical, 12)
                     .background(RoundedRectangle(cornerRadius: 14).fill(Color(.systemBackground)))
                     .shadow(color: .black.opacity(0.07), radius: 6, x: 0, y: 4)
-
+                
                 Button { vm.submit() } label: {
                     Image(systemName: "magnifyingglass")
                         .font(.title3.weight(.semibold))
@@ -294,10 +336,10 @@ struct DashboardAdminView: View {
                         .background(Circle().fill(Color.accentColor.opacity(0.15)))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Enviar a Gemini")
             }
             .padding(.horizontal, 24)
-
+            
+            // 🔹 Mensaje de error
             if let error = vm.error, vm.reveal == .none {
                 Text(error)
                     .font(.callout)
@@ -305,8 +347,8 @@ struct DashboardAdminView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
             }
-
-            // Contenido
+            
+            // 🔹 Contenido principal
             Group {
                 switch vm.reveal {
                 case .none:
@@ -316,7 +358,6 @@ struct DashboardAdminView: View {
                 case .ventanillas:
                     if !vm.ventanillas.isEmpty { CardVentanillas(ventanillas: vm.ventanillas) }
                 case .insights:
-                    // Si vino JSON estructurado → tarjetas; si no → texto libre
                     if let i = vm.insights {
                         CardInsights(insights: i)
                             .padding(.horizontal, 20)
@@ -353,11 +394,13 @@ struct DashboardAdminView: View {
                     .padding(.horizontal, 20)
                 }
             }
-
+            
+            // 🔹 Indicador de carga
             if vm.isLoading {
-                ProgressView("Cargando…").padding(.top, 6)
+                ProgressView("Cargando…")
+                    .padding(.top, 6)
             }
-
+            
             Spacer()
         }
     }
