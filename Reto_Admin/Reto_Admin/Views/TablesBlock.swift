@@ -168,7 +168,3 @@ private struct EmptyRowView: View {
     }
 }
 
-// MARK: - Preview
-#Preview {
-    TablesBlock()
-}

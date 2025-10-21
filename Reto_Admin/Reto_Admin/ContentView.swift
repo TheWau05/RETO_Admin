@@ -34,7 +34,7 @@ struct ContentView: View {
             }
             .tabItem { Label("Historial", systemImage: "list.bullet.rectangle") }
             .tag(AdminTab.historial)
-            
+
             NavigationStack(path: $router.rendimientoPath) {
                 RendimientoEmpleadoView()
             }
@@ -46,12 +46,18 @@ struct ContentView: View {
             }
             .tabItem { Label("Estadistica", systemImage: "gearshape") }
             .tag(AdminTab.estadistica)
+
+            // 🟢 Nueva pestaña Turno Rápido
+            NavigationStack {
+                TurnoRapidoAdminView()
+            }
+            .tabItem { Label("Turno rápido", systemImage: "clock.arrow.circlepath") }
+            .tag(AdminTab.turnoRapido)
         }
         .tint(AdminColors.marca)
         .environmentObject(router)
         .environmentObject(admin)
         .onChange(of: router.selected) { router.popToRoot($0) }
-
         .globalExecutiveBot()
     }
 }
