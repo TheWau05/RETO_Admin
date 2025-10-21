@@ -300,3 +300,5 @@ struct TurnosAverageBin: Identifiable {
     let type: String // "Espera" or "Servicio"
     let value: Double
 }
+
+
