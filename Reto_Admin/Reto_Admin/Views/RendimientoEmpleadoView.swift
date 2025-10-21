@@ -115,15 +115,30 @@ struct RendimientoEmpleadoView: View {
         
         // Lista de Detalles
         List {
+//            Section(header: Text("Historial de Servicio Detallado").font(.headline)) {
+//                if reporte.details.isEmpty {
+//                    Text("No hay turnos atendidos para este empleado en el periodo seleccionado.")
+//                } else {
+////                    ForEach(reporte.details) { detalle in
+////                        turnoRow(detalle: detalle)
+////                    }
+//                    ForEach(reporte.details.filter { $0.End_Time != nil }) { detalle in
+//                        turnoRow(detalle: detalle)
+//                    }
+//                }
+//            }
             Section(header: Text("Historial de Servicio Detallado").font(.headline)) {
-                if reporte.details.isEmpty {
-                    Text("No hay turnos atendidos para este empleado en el periodo seleccionado.")
+                let turnosCompletados = reporte.details.filter { $0.End_Time != nil }
+                
+                if turnosCompletados.isEmpty {
+                    Text("No hay turnos completados para este empleado en el periodo seleccionado.")
                 } else {
-                    ForEach(reporte.details) { detalle in
+                    ForEach(turnosCompletados) { detalle in
                         turnoRow(detalle: detalle)
                     }
                 }
             }
+
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
@@ -175,7 +190,7 @@ struct RendimientoEmpleadoView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("\(detalle.Duracion_Minutos) min")
+                Text("\(detalle.Duracion_Minutos ?? 0) min")
                     .fontWeight(.semibold)
                     .foregroundStyle(AdminColors.acento)
                 Text("Ventanilla \(detalle.Ventanilla_Id)")
