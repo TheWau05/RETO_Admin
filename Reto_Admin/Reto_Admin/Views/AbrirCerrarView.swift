@@ -13,8 +13,6 @@
 
 import SwiftUI
 
-// MARK: - Persistencia (UserDefaults)
-
 private let kACVDefaultsKey = "AbrirCerrarVentanilla_State_v2"
 
 private struct EmployeeMini: Codable, Hashable {
@@ -23,8 +21,8 @@ private struct EmployeeMini: Codable, Hashable {
 }
 
 private struct ACVState: Codable {
-    var asignados: [Int: EmployeeMini] = [:] // ventanilla -> empleado (mini)
-    var estados:   [Int: Bool] = [:]         // ventanilla -> cerrada(true)/abierta(false)
+    var asignados: [Int: EmployeeMini] = [:]
+    var estados:   [Int: Bool] = [:]
     var ventanillaSeleccionada: Int = 1
 }
 
@@ -34,8 +32,6 @@ private extension EmployeeMini {
 private extension EmployeeBasic {
     init(from mini: EmployeeMini) { self.init(id: mini.id, name: mini.name) }
 }
-
-// MARK: - View
 
 struct AbrirCerrarVentanillaPadView: View {
     let api: AdminAPI
@@ -50,6 +46,11 @@ struct AbrirCerrarVentanillaPadView: View {
     @State private var sending = false
     @State private var serviceDown = false
     @State private var errorText: String?
+
+    @State private var showingEmergencySheet = false
+    @State private var emergencyUsername = ""
+    @State private var forcing = false
+    @State private var emergencyResult: String?
 
     var body: some View {
         NavigationStack {
@@ -68,15 +69,10 @@ struct AbrirCerrarVentanillaPadView: View {
             .navigationBarTitleDisplayMode(.inline)
             .tint(AdminColors.marca)
             .task {
-                // 1) Cargar lo que haya en local
                 loadPersistedState()
                 syncEstadoConSeleccion()
                 syncEmpleadoConVentanilla()
-
-                // 2) Intentar cargar empleados libres (no bloquea si falla)
                 await loadEmployees()
-
-                // 3) Si es un dispositivo nuevo (iPad) sin estado local, bootstrap desde backend
                 if asignados.isEmpty && estados.isEmpty {
                     await bootstrapDesdeServidor()
                 }
@@ -88,8 +84,6 @@ struct AbrirCerrarVentanillaPadView: View {
             }
         }
     }
-
-    // MARK: - UI
 
     private func contentCard(width: CGFloat, height: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 44) {
@@ -127,6 +121,27 @@ struct AbrirCerrarVentanillaPadView: View {
             }
             .padding(.top, 8)
             .zIndex(0)
+
+            Button {
+                showingEmergencySheet = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "bolt.fill")
+                    Text("Forzar turno")
+                        .font(.system(size: 18, weight: .semibold))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(AdminColors.marca.opacity(0.08))
+                .foregroundStyle(AdminColors.marca)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 10)
+            .zIndex(0)
+            .sheet(isPresented: $showingEmergencySheet) {
+                emergencyTurnoSheet
+            }
         }
         .padding(50)
         .frame(maxWidth: width, minHeight: height)
@@ -187,7 +202,7 @@ struct AbrirCerrarVentanillaPadView: View {
                     ForEach(empleados) { e in
                         Button {
                             empleadoSel = e
-                            guardarEmpleadoActual() // RAM + persistencia
+                            guardarEmpleadoActual()
                         } label: {
                             HStack {
                                 Text(e.name)
@@ -209,9 +224,8 @@ struct AbrirCerrarVentanillaPadView: View {
                     .padding(.vertical, 18)
                     .padding(.horizontal, 20)
                     .background(RoundedRectangle(cornerRadius: 16).fill(Color(.systemGray6)))
-                    .contentShape(Rectangle()) // clicable todo el rectángulo
+                    .contentShape(Rectangle())
                 }
-                // Aunque la API no traiga al asignado, si está persistido el botón sigue sirviendo
                 .disabled(serviceDown)
                 .zIndex(2)
             }
@@ -243,8 +257,6 @@ struct AbrirCerrarVentanillaPadView: View {
         return Array(s).sorted()
     }
 
-    // MARK: - Datos
-
     private func loadEmployees() async {
         loading = true
         serviceDown = false
@@ -253,7 +265,6 @@ struct AbrirCerrarVentanillaPadView: View {
             let xs = try await api.unassignedEmployees()
             await MainActor.run {
                 empleados = xs
-                // si ya hay uno persistido para esta ventanilla, NO lo pisamos
                 if empleadoSel == nil {
                     empleadoSel = asignados[ventanilla] ?? xs.first
                 }
@@ -269,48 +280,35 @@ struct AbrirCerrarVentanillaPadView: View {
         }
     }
 
-    // Bootstrap inicial desde servidor (para iPad u otro dispositivo sin estado local)
     @MainActor
     private func bootstrapDesdeServidor() async {
         do {
-            let server = try await fetchVentanillasStatus() // ya lo tienes definido en tu proyecto
-
-            var nuevosEstados: [Int: Bool] = [:]            // true=cerrada
+            let server = try await fetchVentanillasStatus()
+            var nuevosEstados: [Int: Bool] = [:]
             var nuevosAsignados: [Int: EmployeeBasic] = [:]
-
             for s in server {
                 let estaCerrada = !s.disponible
                 nuevosEstados[s.id] = estaCerrada
-
                 if let emp = s.empId {
-                    // Si no tienes el nombre, usa uno placeholder o agrega GET /employees/{id} para traerlo
                     let nombre = asignados[s.id]?.name ?? "Empleado \(emp)"
                     nuevosAsignados[s.id] = EmployeeBasic(id: emp, name: nombre)
                 }
             }
-
             estados = nuevosEstados
             asignados = nuevosAsignados
-
-            // Ajustar selección actual
             if let e = nuevosAsignados[ventanilla] {
                 empleadoSel = e
             } else if empleadoSel == nil {
                 empleadoSel = empleados.first
             }
             cerrada = estadoDe(vent: ventanilla)
-
-            // Guardar para próximas aperturas en ese dispositivo
             persistState()
         } catch {
-            print("Bootstrap desde servidor falló: \(error)")
             if empleadoSel == nil { empleadoSel = empleados.first }
         }
     }
 
-    // MARK: - Estado en memoria
-
-    private func estadoDe(vent: Int) -> Bool { estados[vent] ?? true } // true=cerrada por defecto
+    private func estadoDe(vent: Int) -> Bool { estados[vent] ?? true }
     private func setEstado(vent: Int, cerrada: Bool) { estados[vent] = cerrada }
     private func guardarEstadoActual() { setEstado(vent: ventanilla, cerrada: cerrada); persistState() }
     private func syncEstadoConSeleccion() { cerrada = estadoDe(vent: ventanilla) }
@@ -330,12 +328,9 @@ struct AbrirCerrarVentanillaPadView: View {
         }
     }
 
-    // MARK: - Acciones
-
     private func onPrimaryButtonTap() async {
         if serviceDown { return }
         guard let empId = empleadoSel?.id else { return }
-
         let newClosed = !cerrada
         let previous = cerrada
         cerrada = newClosed
@@ -360,8 +355,6 @@ struct AbrirCerrarVentanillaPadView: View {
         }
     }
 
-    // MARK: - Persistencia
-
     private func persistState() {
         var snapshot = ACVState(
             asignados: asignados.mapValues { EmployeeMini(from: $0) },
@@ -370,13 +363,10 @@ struct AbrirCerrarVentanillaPadView: View {
         )
         snapshot.estados[ventanilla] = cerrada
         if let e = empleadoSel { snapshot.asignados[ventanilla] = EmployeeMini(from: e) }
-
         do {
             let data = try JSONEncoder().encode(snapshot)
             UserDefaults.standard.set(data, forKey: kACVDefaultsKey)
-        } catch {
-            print("Persistencia ACV falló:", error)
-        }
+        } catch { }
     }
 
     private func loadPersistedState() {
@@ -385,15 +375,79 @@ struct AbrirCerrarVentanillaPadView: View {
             let snapshot = try JSONDecoder().decode(ACVState.self, from: data)
             estados    = snapshot.estados
             ventanilla = snapshot.ventanillaSeleccionada
-
             var asign: [Int: EmployeeBasic] = [:]
             for (k, v) in snapshot.asignados { asign[k] = EmployeeBasic(from: v) }
             asignados = asign
-
             cerrada = estadoDe(vent: ventanilla)
             empleadoSel = asignados[ventanilla] ?? empleadoSel
+        } catch { }
+    }
+
+    private var emergencyTurnoSheet: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 24) {
+                Text("Forzar turno de emergencia")
+                    .font(.system(size: 24, weight: .bold))
+
+                TextField("Usuario", text: $emergencyUsername)
+                    .textFieldStyle(.roundedBorder)
+                    .textInputAutocapitalization(.never)
+                    .disableAutocorrection(true)
+
+                if forcing {
+                    ProgressView("Creando turno...")
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Button {
+                        Task { await forceEmergencyTurno() }
+                    } label: {
+                        Text("Crear turno de emergencia")
+                            .font(.system(size: 20, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(AdminColors.marca)
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .disabled(emergencyUsername.isEmpty)
+                }
+
+                if let r = emergencyResult {
+                    Text(r)
+                        .foregroundStyle(.secondary)
+                        .font(.callout)
+                        .padding(.top, 8)
+                }
+
+                Spacer()
+            }
+            .padding(30)
+            .navigationTitle("Turno de emergencia")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cerrar") { showingEmergencySheet = false }
+                }
+            }
+        }
+    }
+
+    private func forceEmergencyTurno() async {
+        guard !emergencyUsername.isEmpty else { return }
+        forcing = true
+        emergencyResult = nil
+
+        do {
+            _ = try await api.createEmergencyTurno(username: emergencyUsername)
+            await MainActor.run {
+                emergencyResult = "✅ Turno de emergencia asignado exitosamente."
+                forcing = false
+            }
         } catch {
-            print("No se pudo leer ACVState:", error)
+            await MainActor.run {
+                emergencyResult = "❌ Error al crear el turno"
+                forcing = false
+            }
         }
     }
 }
