@@ -65,7 +65,6 @@ struct AbrirCerrarVentanillaPadView: View {
                         VStack(alignment: .trailing) {
                             BotonSalirSesion(loggedIn: $loggedIn)
                         }
-
                     }
                     .frame(width: geo.size.width, height: geo.size.height)
                 }
@@ -82,8 +81,6 @@ struct AbrirCerrarVentanillaPadView: View {
                     await bootstrapDesdeServidor()
                 }
             }
-                        
-
             .onChange(of: ventanilla) { _, _ in
                 syncEstadoConSeleccion()
                 syncEmpleadoConVentanilla()
@@ -108,47 +105,47 @@ struct AbrirCerrarVentanillaPadView: View {
                     .frame(maxWidth: .infinity)
             }
 
-            NavigationLink {
-                StatusOverviewView(
-                    ventanillas: allVentanillas,
-                    estados: estados,
-                    asignados: asignados
-                )
-            } label: {
-                HStack {
-                    Image(systemName: "list.bullet.rectangle")
-                    Text("Ver estatus y asignaciones")
-                        .font(.system(size: 20, weight: .semibold))
+            // =========================
+            // FIXED: Buttons grouped with spacing so they don't merge
+            // =========================
+            VStack(spacing: 16) {
+                NavigationLink {
+                    StatusOverviewView(
+                        ventanillas: allVentanillas,
+                        estados: estados,
+                        asignados: asignados
+                    )
+                } label: {
+                    HStack {
+                        Image(systemName: "list.bullet.rectangle")
+                        Text("Ver estatus y asignaciones")
+                            .font(.system(size: 20, weight: .semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(AdminColors.marca.opacity(0.12))
+                    .foregroundStyle(AdminColors.marca)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .padding(.vertical, 16)
-                .background(AdminColors.marca.opacity(0.12))
-                .foregroundStyle(AdminColors.marca)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-            }
-            .padding(.top, 8)
-            .zIndex(0)
+                .buttonStyle(.plain)
 
-            Button {
-                showingEmergencySheet = true
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "bolt.fill")
-                    Text("Forzar turno")
-                        .font(.system(size: 18, weight: .semibold))
+                Button {
+                    showingEmergencySheet = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "bolt.fill")
+                        Text("Forzar turno")
+                            .font(.system(size: 18, weight: .semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(AdminColors.marca.opacity(0.08))
+                    .foregroundStyle(AdminColors.marca)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(AdminColors.marca.opacity(0.08))
-                .foregroundStyle(AdminColors.marca)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
             .padding(.top, 10)
-            .zIndex(0)
-            .sheet(isPresented: $showingEmergencySheet) {
-                emergencyTurnoSheet
-            }
         }
         .padding(50)
         .frame(maxWidth: width, minHeight: height)
@@ -174,7 +171,6 @@ struct AbrirCerrarVentanillaPadView: View {
                     }
                     .frame(maxWidth: 240)
                     .padding(.top, 6)
-                    
                 }
 
                 Spacer()
@@ -235,7 +231,7 @@ struct AbrirCerrarVentanillaPadView: View {
                     .contentShape(Rectangle())
                 }
                 .disabled(serviceDown)
-                .zIndex(2)
+                .zIndex(2) // keep for Menu popover priority
             }
         }
     }
