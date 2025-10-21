@@ -15,6 +15,8 @@ protocol AdminAPI {
     func turnos24hAverages() async throws -> [TurnoAverageHour]
     func turnos24hComparison() async throws -> [TurnosComparisonItem]
     func turnos24hBins() async throws -> [TurnoHourBin]
+    func createEmergencyTurno(username: String) async throws -> String
+
 
     // Turnos (NO usados por Abrir/Cerrar)
     func aheadCount(turnoId: Int) async throws -> AheadCount
@@ -48,6 +50,8 @@ extension AdminAPI {
     func turnos24hAverages() async throws -> [TurnoAverageHour] { throw APIError.unimplemented }
     func turnos24hComparison() async throws -> [TurnosComparisonItem] { throw APIError.unimplemented }
     func turnos24hBins() async throws -> [TurnoHourBin] { throw APIError.unimplemented }
+    func createEmergencyTurno(username: String) async throws -> String { throw APIError.unimplemented }
+
 
     func aheadCount(turnoId: Int) async throws -> AheadCount { throw APIError.unimplemented }
     func getNextTurno() async throws -> NextTurno { throw APIError.unimplemented }
@@ -65,6 +69,46 @@ extension AdminAPI {
     // Si nadie lo implementa: por claridad fallar explícito
     func unassignedEmployees() async throws -> [EmployeeBasic] { throw APIError.unimplemented }
 }
+
+// MARK: - Forzar Turno de Emergencia
+extension HTTPAdminAPI {
+    func createEmergencyTurno(username: String) async throws -> String {
+        // Endpoint completo
+        let url = baseURL.appendingPathComponent("turnos/emergency")
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        // Body JSON
+        let body: [String: String] = ["username": username]
+        req.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+
+        // Petición
+        let (data, resp) = try await session.data(for: req)
+        guard let http = resp as? HTTPURLResponse else {
+            throw APIError.requestFailed(-1)
+        }
+
+        guard (200..<300).contains(http.statusCode) else {
+            let raw = String(data: data, encoding: .utf8) ?? "Error desconocido"
+            throw NSError(domain: "HTTPAdminAPI", code: http.statusCode, userInfo: [
+                NSLocalizedDescriptionKey: "Falló con código \(http.statusCode): \(raw)"
+            ])
+        }
+
+        // Parseo del resultado como texto legible
+        if let obj = try? JSONSerialization.jsonObject(with: data, options: []),
+           let pretty = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted]),
+           let str = String(data: pretty, encoding: .utf8) {
+            return str
+        } else if let str = String(data: data, encoding: .utf8) {
+            return str
+        } else {
+            return "Turno de emergencia creado exitosamente"
+        }
+    }
+}
+
 
 // MARK: - Cliente HTTP SOLO Abrir/Cerrar
 final class HTTPAdminAPI: AdminAPI {
