@@ -59,33 +59,26 @@ final class ReporteService {
         cfg.waitsForConnectivity = true
         cfg.timeoutIntervalForRequest = 45
         cfg.timeoutIntervalForResource = 90
-        cfg.allowsConstrainedNetworkAccess = true
-        cfg.allowsExpensiveNetworkAccess = true
         return URLSession(configuration: cfg)
     }()
 
     func fetchExecutive() async throws -> ExecResponse {
         var req = URLRequest(url: execURL)
         req.httpMethod = "GET"
-        req.cachePolicy = .reloadIgnoringLocalCacheData
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.setValue("close", forHTTPHeaderField: "Connection")
         let data = try await dataWithRetry(for: req)
         return try parseExecutive(data: data)
     }
 
-    
     func askGemini(prompt: String) async throws -> GeminiFlexible {
         var req = URLRequest(url: askURL)
         req.httpMethod = "POST"
-        req.cachePolicy = .reloadIgnoringLocalCacheData
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.setValue("close", forHTTPHeaderField: "Connection")
-
         let body: [String: Any] = ["prompt": prompt, "ask": prompt]
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
-
         let data = try await dataWithRetry(for: req)
 
         if let env = try? JSONDecoder().decode(AskGeminiEnvelope.self, from: data),
@@ -96,26 +89,22 @@ final class ReporteService {
                 .replacingOccurrences(of: "\\/", with: "/")
 
             if let d = unescaped.data(using: .utf8) {
-
                 if let ins = try? JSONDecoder().decode(InsightsGemini.self, from: d) {
                     return GeminiFlexible(rawText: nil, insights: ins)
                 }
-
-                if let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any] {
-                    if let direct = obj["direct_answer"] as? String, !direct.isEmpty {
-                        return GeminiFlexible(rawText: direct, insights: nil)
-                    }
-                    if let answer = obj["answer"] as? String, !answer.isEmpty {
-                        return GeminiFlexible(rawText: answer, insights: nil)
-                    }
-                    if let msg = obj["message"] as? String, !msg.isEmpty {
-                        return GeminiFlexible(rawText: msg, insights: nil)
-                    }
+                if let obj = try? JSONSerialization.jsonObject(with: d) {
+                    let flat = Self.flattenJSONToPlain(obj)
+                    if !flat.isEmpty { return GeminiFlexible(rawText: flat, insights: nil) }
                 }
             }
 
             let plain = unescaped.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !plain.isEmpty { return GeminiFlexible(rawText: plain, insights: nil) }
+            if !plain.isEmpty, !Self.looksLikeJSON(plain) {
+                return GeminiFlexible(rawText: plain, insights: nil)
+            }
+            if !plain.isEmpty {
+                return GeminiFlexible(rawText: Self.stripBraces(plain), insights: nil)
+            }
         }
 
         if let ins = try? JSONDecoder().decode(InsightsGemini.self, from: data) {
@@ -123,7 +112,12 @@ final class ReporteService {
         }
 
         if let s = String(data: data, encoding: .utf8) {
-            return GeminiFlexible(rawText: s.trimmingCharacters(in: .whitespacesAndNewlines), insights: nil)
+            if let obj = try? JSONSerialization.jsonObject(with: data) {
+                let flat = Self.flattenJSONToPlain(obj)
+                return GeminiFlexible(rawText: flat.isEmpty ? Self.stripBraces(s) : flat, insights: nil)
+            } else {
+                return GeminiFlexible(rawText: Self.looksLikeJSON(s) ? Self.stripBraces(s) : s.trimmingCharacters(in: .whitespacesAndNewlines), insights: nil)
+            }
         }
 
         throw URLError(.cannotParseResponse)
@@ -135,15 +129,14 @@ final class ReporteService {
             do {
                 let (data, resp) = try await session.data(for: req)
                 if let http = resp as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-                    let body = String(data: data, encoding: .utf8) ?? ""
-                    throw NSError(domain: "HTTP", code: http.statusCode, userInfo: ["body": body])
+                    throw NSError(domain: "HTTP", code: http.statusCode, userInfo: [:])
                 }
                 return data
             } catch {
                 last = error
                 let ns = error as NSError
                 let transient = [NSURLErrorTimedOut, NSURLErrorNetworkConnectionLost, NSURLErrorCannotConnectToHost, NSURLErrorCannotFindHost]
-                if attempt < retries && (transient.contains(ns.code) || ns.localizedDescription.localizedCaseInsensitiveContains("reset")) {
+                if attempt < retries && transient.contains(ns.code) {
                     try await Task.sleep(nanoseconds: UInt64(300_000_000 * (attempt + 1)))
                     continue
                 }
@@ -180,21 +173,71 @@ final class ReporteService {
         let d = try JSONSerialization.data(withJSONObject: arr)
         return try JSONDecoder().decode(T.self, from: d)
     }
+
+    private static func looksLikeJSON(_ s: String) -> Bool {
+        let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (t.hasPrefix("{") && t.hasSuffix("}")) || (t.hasPrefix("[") && t.hasSuffix("]"))
+    }
+
+    private static func stripBraces(_ s: String) -> String {
+        var out = s
+            .replacingOccurrences(of: "{", with: "")
+            .replacingOccurrences(of: "}", with: "")
+            .replacingOccurrences(of: "[", with: "")
+            .replacingOccurrences(of: "]", with: "")
+            .replacingOccurrences(of: "\"", with: "")
+        out = out.replacingOccurrences(of: ":", with: ": ")
+        return out
+            .split(separator: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .joined(separator: "\n")
+    }
+
+    private static func flattenJSONToPlain(_ obj: Any) -> String {
+        var lines: [String] = []
+        func walk(_ k: String?, _ v: Any) {
+            if let dict = v as? [String: Any] {
+                for (kk, vv) in dict { walk(kk, vv) }
+            } else if let arr = v as? [Any] {
+                for vv in arr { walk(k, vv) }
+            } else if let s = v as? String {
+                let key = k?.isEmpty == false ? "\(k!): " : ""
+                lines.append("\(key)\(s)")
+            } else if let n = v as? NSNumber {
+                let key = k?.isEmpty == false ? "\(k!): " : ""
+                lines.append("\(key)\(n)")
+            }
+        }
+        walk(nil, obj)
+        return lines
+            .map { line in
+                var l = line
+                if l.lowercased().hasPrefix("response:") {
+                    l = l.replacingOccurrences(of: "response:", with: "Respuesta:")
+                    l = l.replacingOccurrences(of: "Response:", with: "Respuesta:")
+                }
+                if l.lowercased().hasPrefix("prompt:") {
+                    l = l.replacingOccurrences(of: "prompt:", with: "Pregunta:")
+                    l = l.replacingOccurrences(of: "Prompt:", with: "Pregunta:")
+                }
+                return "• \(l.trimmingCharacters(in: .whitespaces))"
+            }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }
 
 @MainActor
 final class PromptVM: ObservableObject {
     enum Reveal: Equatable { case none, resumen, ventanillas, insights, todo }
-
     @Published var prompt: String = ""
     @Published var reveal: Reveal = .none
     @Published var isLoading = false
-    @Published var error: String?
+    @Published var errorMessage: String?
     @Published var resumen: ResumenGeneral?
     @Published var ventanillas: [VentanillaRow] = []
     @Published var insights: InsightsGemini?
     @Published var rawAnswer: String?
-
     private let service = ReporteService()
 
     func submit() {
@@ -210,7 +253,7 @@ final class PromptVM: ObservableObject {
     }
 
     func load() async {
-        error = nil
+        errorMessage = nil
         rawAnswer = nil
         isLoading = true
         defer { isLoading = false }
@@ -223,41 +266,63 @@ final class PromptVM: ObservableObject {
             }
             if reveal == .insights {
                 let flex = try await service.askGemini(prompt: prompt)
-                self.insights = flex.insights
-                self.rawAnswer = flex.rawText
+                insights = flex.insights
+                rawAnswer = flex.rawText
             }
         } catch {
-            if let e = error as NSError?, e.domain == "HTTP" {
-                let body = (e.userInfo["body"] as? String) ?? ""
-                self.error = "HTTP \(e.code): \(body.prefix(200))"
-            } else {
-                self.error = error.localizedDescription
-            }
+            errorMessage = "Ocurrió un error al obtener datos"
         }
     }
 }
-
 
 struct DashboardAdminView: View {
     @StateObject private var vm = PromptVM()
     @EnvironmentObject var router: AdminRouter
     @Binding var loggedIn: Bool
-    
+    @State private var activeAlert: ActiveAlert?
+
+    enum ActiveAlert: Identifiable {
+        case salir
+        var id: String { "salir" }
+    }
+
     var body: some View {
         ZStack {
             LinearGradient(colors: [Color(.systemGray6), Color(.systemGray5)],
                            startPoint: .topLeading, endPoint: .bottomTrailing)
                 .ignoresSafeArea()
         }
-        .ignoresSafeArea(.keyboard, edges: .bottom)
         .overlay(content)
+        .alert(item: $activeAlert) { _ in
+            Alert(
+                title: Text("Seguro"),
+                message: Text("Quieres cerrar tu sesión"),
+                primaryButton: .destructive(Text("Continuar")) {
+                    loggedIn = false
+                    router.selected = .inicio
+                    router.popToRoot(.inicio)
+                },
+                secondaryButton: .cancel(Text("Cancelar"))
+            )
+        }
     }
-    
+
     @ViewBuilder
     private var content: some View {
         VStack(spacing: 22) {
             HStack {
-                TextField("Pregunta a Gemini o escribe: resumen | ventanillas | todo", text: $vm.prompt)
+                Spacer()
+                Button(action: { activeAlert = .salir }) {
+                    Image(systemName: "rectangle.portrait.and.arrow.forward.fill")
+                        .font(.system(size: 26, weight: .semibold))
+                        .foregroundColor(.red)
+                        .padding(.trailing, 24)
+                        .padding(.top, 12)
+                }
+            }
+
+            HStack {
+                TextField("Pregunta a Gemini o escribe resumen | ventanillas | todo", text: $vm.prompt)
                     .textInputAutocapitalization(.never)
                     .disableAutocorrection(true)
                     .submitLabel(.search)
@@ -266,25 +331,23 @@ struct DashboardAdminView: View {
                     .padding(.vertical, 12)
                     .background(RoundedRectangle(cornerRadius: 14).fill(Color(.systemBackground)))
                     .shadow(color: .black.opacity(0.07), radius: 6, x: 0, y: 4)
-                
+
                 Button { vm.submit() } label: {
                     Image(systemName: "magnifyingglass")
                         .font(.title3.weight(.semibold))
                         .padding(12)
                         .background(Circle().fill(Color.accentColor.opacity(0.15)))
                 }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal, 24)
-            
-            if let error = vm.error, vm.reveal == .none {
+
+            if let error = vm.errorMessage {
                 Text(error)
                     .font(.callout)
                     .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
             }
-            
+
             Group {
                 switch vm.reveal {
                 case .none:
@@ -307,7 +370,7 @@ struct DashboardAdminView: View {
                         }
                         .padding(.horizontal, 20)
                     } else {
-                        Text("Esperando respuesta de IA…")
+                        Text("Esperando respuesta de IA")
                             .font(.callout)
                             .foregroundColor(.secondary)
                     }
@@ -330,28 +393,27 @@ struct DashboardAdminView: View {
                     .padding(.horizontal, 20)
                 }
             }
-            
+
             if vm.isLoading {
-                ProgressView("Cargando…")
+                ProgressView("Cargando")
                     .padding(.top, 6)
             }
-            
+
             Spacer()
         }
     }
 }
 
-
 private struct HintCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Este panel responde a tu prompt.")
+            Text("Este panel responde a tu prompt")
                 .font(.headline)
-            Text("Prueba con:")
+            Text("Prueba con")
             VStack(alignment: .leading, spacing: 4) {
-                Text("• resumen — métricas generales 24h")
-                Text("• ventanillas — desglose por ventanilla")
-                Text("• todo — todo lo anterior")
+                Text("• resumen  métricas generales 24h")
+                Text("• ventanillas  desglose por ventanilla")
+                Text("• todo  todo lo anterior")
                 Text("• cualquier pregunta libre para Gemini")
             }
             .foregroundColor(.secondary)
@@ -365,11 +427,11 @@ private struct CardResumen: View {
     let resumen: ResumenGeneral
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Resumen (24h)").font(.title3).bold()
+            Text("Resumen 24h").font(.title3).bold()
             HStack(spacing: 10) {
                 StatPill(title: "Atendidos", value: "\(resumen.TotalAtendidos)")
-                StatPill(title: "Serv. prom.", value: String(format: "%.1f min", resumen.PromedioServicio))
-                StatPill(title: "Espera prom.", value: String(format: "%.1f min", resumen.PromedioEspera))
+                StatPill(title: "Serv prom", value: String(format: "%.1f min", resumen.PromedioServicio))
+                StatPill(title: "Espera prom", value: String(format: "%.1f min", resumen.PromedioEspera))
                 StatPill(title: "Ventanillas", value: "\(resumen.VentanillasActivas)")
             }
         }
@@ -393,9 +455,9 @@ private struct CardVentanillas: View {
                     }
                     Spacer()
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text("Atendidos: \(v.TotalAtendidos)").font(.subheadline)
-                        Text("Serv. prom.: \(format(v.PromedioServicio))").font(.subheadline)
-                        Text("Espera prom.: \(format(v.PromedioEspera))").font(.subheadline)
+                        Text("Atendidos \(v.TotalAtendidos)").font(.subheadline)
+                        Text("Serv prom \(format(v.PromedioServicio))").font(.subheadline)
+                        Text("Espera prom \(format(v.PromedioEspera))").font(.subheadline)
                     }
                 }
                 Divider()
@@ -414,7 +476,7 @@ private struct CardInsights: View {
     let insights: InsightsGemini
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Insights (Gemini)").font(.title3).bold()
+            Text("Insights Gemini").font(.title3).bold()
             if !insights.incidencias.isEmpty { Bullet("Incidencias", items: insights.incidencias) }
             if !insights.picos_demanda.isEmpty { Bullet("Picos de demanda", items: insights.picos_demanda) }
             if !insights.rendimiento_destacado.isEmpty { Bullet("Rendimiento destacado", items: insights.rendimiento_destacado) }
