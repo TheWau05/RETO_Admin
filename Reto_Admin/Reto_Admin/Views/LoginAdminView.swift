@@ -55,7 +55,6 @@ struct LoginAdminView: View {
 
                         do {
                             let result = try await fetchLogin(username: u, password: p)
-                            // Se espera: { message, username?, permissions?, empid? }
                             guard let perms = result.permissions, let emp = result.empid else {
                                 alertMessage = "Respuesta inválida del servidor."
                                 showAlert = true
@@ -67,19 +66,20 @@ struct LoginAdminView: View {
                                 return
                             }
 
-                            // Actualiza @State en el MainActor
                             await MainActor.run {
                                 self.permisos = perms
                                 self.idempleado = emp
                                 self.loggedIn = true
                             }
-
+                            
+                            
                         } catch {
                             alertMessage = error.localizedDescription.isEmpty
                                 ? "Error al procesar el login."
                                 : error.localizedDescription
                             showAlert = true
                         }
+
                     }
                 }
                 .padding()

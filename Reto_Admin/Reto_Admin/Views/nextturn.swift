@@ -1,10 +1,3 @@
-//
-//  nextturn.swift
-//  Reto_Admin
-//
-//  Created by 박진혁 on 10/21/25.
-//
-
 import SwiftUI
 
 fileprivate let uiDateFormatter: DateFormatter = {
@@ -60,11 +53,10 @@ private struct RecordRow: View {
     }
 }
 
-// ⬇️ AÑADIDO: parámetros que pasas desde EmpleadoTabView
 struct nextturnView: View {
     let idempleado: Int
     let permisos: String
-    let api: any AdminAPI   // coincide con apiContainer.client
+    let api: any AdminAPI
 
     @State private var records: [Record] = []
     @State private var isLoading = false
@@ -88,8 +80,6 @@ struct nextturnView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
-                    Text("User Records")
-                        .font(.system(size: 38, weight: .bold, design: .rounded))
 
                     if let errorMessage {
                         Text(errorMessage).font(.callout).foregroundStyle(.red)
@@ -135,8 +125,7 @@ struct nextturnView: View {
         isLoading = true
         defer { isLoading = false }
         do {
-            // Si tu API requiere el empleado o client, úsalo aquí, p.ej.:
-            // records = try await TurnosAPI.fetchNext30(api: api, empleadoId: idempleado)
+            
             records = try await TurnosAPI.fetchNext30()
         } catch {
             errorMessage = "Formato no válido o error de red: \(error.localizedDescription)"
@@ -145,6 +134,5 @@ struct nextturnView: View {
 }
 
 #Preview {
-    // Preview con datos dummy
     nextturnView(idempleado: 25, permisos: "Emp", api: MockAdminAPI())
 }

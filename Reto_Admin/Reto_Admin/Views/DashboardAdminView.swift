@@ -256,26 +256,10 @@ final class PromptVM: ObservableObject {
 }
 
 
-import SwiftUI
-
 struct DashboardAdminView: View {
     @StateObject private var vm = PromptVM()
-    
-    // 🔹 Para manejar el cierre de sesión
     @EnvironmentObject var router: AdminRouter
     @Binding var loggedIn: Bool
-    @State private var activeAlert: ActiveAlert?
-    
-    // ✅ Conforma a Identifiable
-    enum ActiveAlert: Identifiable {
-        case salir
-        
-        var id: String {
-            switch self {
-            case .salir: return "salir"
-            }
-        }
-    }
     
     var body: some View {
         ZStack {
@@ -285,38 +269,11 @@ struct DashboardAdminView: View {
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .overlay(content)
-        .alert(item: $activeAlert) { alert in
-            switch alert {
-            case .salir:
-                return Alert(
-                    title: Text("¿Seguro?"),
-                    message: Text("¿Quieres cerrar tu sesión?"),
-                    primaryButton: .destructive(Text("Continuar")) {
-                        loggedIn = false
-                        router.selected = .inicio
-                        router.popToRoot(.inicio)
-                    },
-                    secondaryButton: .cancel()
-                )
-            }
-        }
     }
     
     @ViewBuilder
     private var content: some View {
         VStack(spacing: 22) {
-            // 🔹 Botón de cerrar sesión (arriba a la derecha)
-            HStack {
-                Spacer()
-                Button(action: { activeAlert = .salir }) {
-                    Image(systemName: "rectangle.portrait.and.arrow.forward.fill")
-                        .font(.system(size: 26, weight: .semibold))
-                        .foregroundColor(.red)
-                        .padding(.trailing, 24)
-                        .padding(.top, 12)
-                }
-            }
-            
             // 🔹 Campo de texto y botón de búsqueda
             HStack {
                 TextField("Pregunta a Gemini o escribe: resumen | ventanillas | todo", text: $vm.prompt)
@@ -405,6 +362,7 @@ struct DashboardAdminView: View {
         }
     }
 }
+
 
 // MARK: - Subviews
 private struct HintCard: View {

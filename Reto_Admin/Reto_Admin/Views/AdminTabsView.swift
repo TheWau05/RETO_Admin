@@ -24,17 +24,17 @@ struct AdminTabsView: View {
                 // ✅ Solo muestra las tabs si está logueado
                 TabView(selection: $router.selected) {
                     
-                    NavigationStack(path: $router.dashboardPath) {
-                        DashboardAdminView(loggedIn: $loggedIn)
-                    }
-                    .tabItem { Label("Inicio", systemImage: "square.grid.2x2.fill") }
-                    .tag(AdminTab.dashboard)
-
                     NavigationStack(path: $router.abrirCerrarPath) {
                         AbrirCerrarVentanillaPadView(api: apiContainer.client)
                     }
                     .tabItem { Label("Abrir/Cerrar", systemImage: "rectangle.portrait.on.rectangle.portrait") }
                     .tag(AdminTab.abrirCerrar)
+                    
+                    NavigationStack(path: $router.dashboardPath) {
+                        DashboardAdminView(loggedIn: $loggedIn)
+                    }
+                    .tabItem { Label("Chatbot", systemImage: "square.grid.2x2.fill") }
+                    .tag(AdminTab.dashboard)
 
                     NavigationStack(path: $router.historialPath) {
                         HistorialAdminView()
