@@ -12,11 +12,9 @@ extension EmployeeBasic {
 }
 
 final class MockAdminAPI: AdminAPI {
-    // Ventanillas
     func openVentanilla(ventanillaId: Int, empId: Int) async throws { }
     func closeVentanilla(ventanillaId: Int) async throws { }
 
-    // Empleados
     func unassignedEmployees() async throws -> [EmployeeBasic] {
         [
             .init(id: 1, name: "Ana López"),

@@ -114,18 +114,6 @@ final class CitasStore: ObservableObject {
 }
 
 
-
-
-
-
-
-
-
-
-
-
-// Hacer structs. Dalr codable, identifiable
-// MARK: - For /stats/turnos/24h-comparison
 struct Turnos24ComparisonItem: Codable, Identifiable {
     let id = UUID()
     let hourStart: Date
@@ -139,7 +127,6 @@ struct Turnos24ComparisonItem: Codable, Identifiable {
     }
 }
 
-// MARK: - For /stats/turnos/24h-averages
 struct Turno24AverageHour: Codable, Identifiable {
     let id = UUID()
     let hourStart: Date
@@ -153,7 +140,6 @@ struct Turno24AverageHour: Codable, Identifiable {
     }
 }
 
-// MARK: - For /ventanillas/status
 struct VentanillaStatus: Codable, Identifiable {
     let id: Int
     let disponible: Bool
@@ -168,7 +154,6 @@ struct VentanillaStatus: Codable, Identifiable {
     }
 }
 
-// MARK: - For /stats/employees/avg-times
 struct EmpAvgTimes: Codable, Identifiable {
     let id: Int
     let avgServiceMinutes: Double
@@ -187,7 +172,6 @@ struct EmpAvgTimes: Codable, Identifiable {
             id = try container.decode(Int.self, forKey: .id)
             empleadoNombre = try container.decode(String.self, forKey: .empleadoNombre)
             
-            // Convert string to Double safely
             let serviceStr = try container.decode(String.self, forKey: .avgServiceMinutes)
             let waitStr = try container.decode(String.self, forKey: .avgWaitMinutes)
             avgServiceMinutes = Double(serviceStr) ?? 0.0
@@ -195,7 +179,6 @@ struct EmpAvgTimes: Codable, Identifiable {
         }
 }
 
-// MARK: - For /stats/ventanillas/avg-times
 struct VentAvgTimes: Codable, Identifiable {
     let id: Int
     let avgServiceMinutes: Double
@@ -218,7 +201,6 @@ struct VentAvgTimes: Codable, Identifiable {
         }
 }
 
-// Función para darle formato a la hora
 let rfc1123Formatter: DateFormatter = {
     let formatter = DateFormatter()
     formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -227,8 +209,6 @@ let rfc1123Formatter: DateFormatter = {
     return formatter
 }()
 
-// Hacer fetch
-// MARK: - Función para traer turnos desde la API
 func fetchTurnos24ComparisonItem() async throws -> [Turnos24ComparisonItem] {
     guard let url = URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206/stats/turnos/24h-comparison") else {
         throw URLError(.badURL)
@@ -240,7 +220,6 @@ func fetchTurnos24ComparisonItem() async throws -> [Turnos24ComparisonItem] {
     return try decoder.decode([Turnos24ComparisonItem].self, from: data)
 }
 
-// MARK: - Función para traer promedio turnos desde la API
 func fetchTurno24AverageHour() async throws -> [Turno24AverageHour] {
     guard let url = URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206/stats/turnos/24h-averages") else {
         throw URLError(.badURL)
@@ -252,7 +231,6 @@ func fetchTurno24AverageHour() async throws -> [Turno24AverageHour] {
     return try decoder.decode([Turno24AverageHour].self, from: data)
 }
 
-// MARK: - Función para traer ventanillas desde la API
 func fetchVentanillasStatus() async throws -> [VentanillaStatus] {
     guard let url = URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206/ventanillas/status") else {
         throw URLError(.badURL)
@@ -263,7 +241,6 @@ func fetchVentanillasStatus() async throws -> [VentanillaStatus] {
     return try decoder.decode([VentanillaStatus].self, from: data)
 }
 
-// MARK: - Función para traer tiempos promedio por empleado desde la API
 func fetchEmpAvgTimes() async throws -> [EmpAvgTimes] {
     guard let url = URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206/stats/employees/avg-times") else {
         throw URLError(.badURL)
@@ -274,7 +251,6 @@ func fetchEmpAvgTimes() async throws -> [EmpAvgTimes] {
     return try decoder.decode([EmpAvgTimes].self, from: data)
 }
 
-// MARK: - Función para traer tiempos promedio por ventanillas desde la API
 func fetchVentAvgTimes() async throws -> [VentAvgTimes] {
     guard let url = URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206/stats/ventanillas/avg-times") else {
         throw URLError(.badURL)
@@ -285,19 +261,17 @@ func fetchVentAvgTimes() async throws -> [VentAvgTimes] {
     return try decoder.decode([VentAvgTimes].self, from: data)
 }
 
-// Crear estructura para acomodar turnos en bins
 struct TurnosComparisonBin: Identifiable {
     let id = UUID()
-    let hour: Int       // 0–23
-    let period: String  // "Past" or "Future"
+    let hour: Int
+    let period: String
     let count: Int
 }
 
-// Crear estructura para acomodar turnos AVGs en bins
 struct TurnosAverageBin: Identifiable {
     let id = UUID()
     let hour: Int
-    let type: String // "Espera" or "Servicio"
+    let type: String
     let value: Double
 }
 

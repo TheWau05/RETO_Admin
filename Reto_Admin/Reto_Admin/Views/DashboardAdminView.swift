@@ -9,7 +9,6 @@
 
 import SwiftUI
 
-// MARK: - Models
 struct ResumenGeneral: Codable, Identifiable {
     var id: String { "resumen" }
     let TotalAtendidos: Int
@@ -40,19 +39,16 @@ struct ExecResponse: Decodable {
     let insights: InsightsGemini?
 }
 
-// Swagger muestra { "prompt": "...", "response": "<string-json>" }
 private struct AskGeminiEnvelope: Decodable {
     let prompt: String?
     let response: String?
 }
 
-// Lo que muestra el dashboard
 struct GeminiFlexible: Codable {
     let rawText: String?
     let insights: InsightsGemini?
 }
 
-// MARK: - Service
 final class ReporteService {
     private let base = URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206")!
     private var execURL: URL { base.appendingPathComponent("/reports/executive-summary") }
@@ -68,7 +64,6 @@ final class ReporteService {
         return URLSession(configuration: cfg)
     }()
 
-    // GET executive summary
     func fetchExecutive() async throws -> ExecResponse {
         var req = URLRequest(url: execURL)
         req.httpMethod = "GET"
@@ -93,7 +88,6 @@ final class ReporteService {
 
         let data = try await dataWithRetry(for: req)
 
-        // 1) Envelope { prompt, response: "<string-json-o-texto>" }
         if let env = try? JSONDecoder().decode(AskGeminiEnvelope.self, from: data),
            let resp = env.response {
             let unescaped = resp
@@ -101,20 +95,16 @@ final class ReporteService {
                 .replacingOccurrences(of: "\\\"", with: "\"")
                 .replacingOccurrences(of: "\\/", with: "/")
 
-            // a) ¿Es un JSON válido? intenta insights primero
             if let d = unescaped.data(using: .utf8) {
 
-                // insights (estructura)
                 if let ins = try? JSONDecoder().decode(InsightsGemini.self, from: d) {
                     return GeminiFlexible(rawText: nil, insights: ins)
                 }
 
-                // b) ¿Trae {"direct_answer":"..."}?
                 if let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any] {
                     if let direct = obj["direct_answer"] as? String, !direct.isEmpty {
                         return GeminiFlexible(rawText: direct, insights: nil)
                     }
-                    // fallback: si hay "answer" o "message"…
                     if let answer = obj["answer"] as? String, !answer.isEmpty {
                         return GeminiFlexible(rawText: answer, insights: nil)
                     }
@@ -124,17 +114,14 @@ final class ReporteService {
                 }
             }
 
-            // c) No fue JSON → texto plano
             let plain = unescaped.trimmingCharacters(in: .whitespacesAndNewlines)
             if !plain.isEmpty { return GeminiFlexible(rawText: plain, insights: nil) }
         }
 
-        // 2) El backend quizá ya regresa directamente InsightsGemini
         if let ins = try? JSONDecoder().decode(InsightsGemini.self, from: data) {
             return GeminiFlexible(rawText: nil, insights: ins)
         }
 
-        // 3) Último recurso: texto crudo
         if let s = String(data: data, encoding: .utf8) {
             return GeminiFlexible(rawText: s.trimmingCharacters(in: .whitespacesAndNewlines), insights: nil)
         }
@@ -142,7 +129,6 @@ final class ReporteService {
         throw URLError(.cannotParseResponse)
     }
 
-    // --- Helpers de red/parseo ---
     private func dataWithRetry(for req: URLRequest, retries: Int = 2) async throws -> Data {
         var last: Error?
         for attempt in 0...retries {
@@ -156,7 +142,6 @@ final class ReporteService {
             } catch {
                 last = error
                 let ns = error as NSError
-                // Reintentos para timeouts / conexión / resets
                 let transient = [NSURLErrorTimedOut, NSURLErrorNetworkConnectionLost, NSURLErrorCannotConnectToHost, NSURLErrorCannotFindHost]
                 if attempt < retries && (transient.contains(ns.code) || ns.localizedDescription.localizedCaseInsensitiveContains("reset")) {
                     try await Task.sleep(nanoseconds: UInt64(300_000_000 * (attempt + 1)))
@@ -197,7 +182,6 @@ final class ReporteService {
     }
 }
 
-// MARK: - ViewModel
 @MainActor
 final class PromptVM: ObservableObject {
     enum Reveal: Equatable { case none, resumen, ventanillas, insights, todo }
@@ -213,7 +197,6 @@ final class PromptVM: ObservableObject {
 
     private let service = ReporteService()
 
-    // La lupita llama aquí
     func submit() {
         let p = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !p.isEmpty else { return }
@@ -226,7 +209,6 @@ final class PromptVM: ObservableObject {
         Task { await load() }
     }
 
-    // Carga según el modo elegido
     func load() async {
         error = nil
         rawAnswer = nil
@@ -274,7 +256,6 @@ struct DashboardAdminView: View {
     @ViewBuilder
     private var content: some View {
         VStack(spacing: 22) {
-            // 🔹 Campo de texto y botón de búsqueda
             HStack {
                 TextField("Pregunta a Gemini o escribe: resumen | ventanillas | todo", text: $vm.prompt)
                     .textInputAutocapitalization(.never)
@@ -296,7 +277,6 @@ struct DashboardAdminView: View {
             }
             .padding(.horizontal, 24)
             
-            // 🔹 Mensaje de error
             if let error = vm.error, vm.reveal == .none {
                 Text(error)
                     .font(.callout)
@@ -305,7 +285,6 @@ struct DashboardAdminView: View {
                     .padding(.horizontal, 24)
             }
             
-            // 🔹 Contenido principal
             Group {
                 switch vm.reveal {
                 case .none:
@@ -352,7 +331,6 @@ struct DashboardAdminView: View {
                 }
             }
             
-            // 🔹 Indicador de carga
             if vm.isLoading {
                 ProgressView("Cargando…")
                     .padding(.top, 6)
@@ -364,7 +342,6 @@ struct DashboardAdminView: View {
 }
 
 
-// MARK: - Subviews
 private struct HintCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {

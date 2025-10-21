@@ -20,7 +20,6 @@ struct EmpleadoTabView: View {
     var body: some View {
         Group {
             if loggedIn {
-                // ✅ Usuario dentro del sistema
                 TabView(selection: $router.selected) {
                     NavigationStack(path: $router.togglePath) {
                         TurnoRapidoAdminView(loggedIn: $loggedIn,idempleado: idempleado, permisos: permisos, api: apiContainer.client)

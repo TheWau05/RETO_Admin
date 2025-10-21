@@ -8,11 +8,10 @@
 import SwiftUI
 import AVFoundation
 
-// MARK: - Helpers para leer el snapshot de Abrir/Cerrar
 private struct EmployeeMini_: Codable, Hashable { let id: Int; let name: String }
 private struct ACVStateSnapshot_: Codable {
-    var asignados: [Int: EmployeeMini_] = [:]     // ventanilla -> empleado
-    var estados:   [Int: Bool] = [:]              // ventanilla -> cerrada(true)/abierta(false)
+    var asignados: [Int: EmployeeMini_] = [:]
+    var estados: [Int: Bool] = [:]
     var ventanillaSeleccionada: Int = 1
 }
 private let kACVDefaultsKey_ = "AbrirCerrarVentanilla_State_v2"
@@ -28,7 +27,6 @@ private func loadVentanillaFromSnapshot() -> (vent: Int?, emp: Int?) {
     return (v, e)
 }
 
-// MARK: - Píldora “Ventanilla X”
 private struct VentChip: View {
     let text: String
     var body: some View {
@@ -43,7 +41,6 @@ private struct VentChip: View {
     }
 }
 
-// MARK: - SOLO 2 estados: available / locked
 private enum VisualState { case available, locked }
 
 private struct StatusBadge: View {
@@ -53,13 +50,13 @@ private struct StatusBadge: View {
     private var color: Color {
         switch state {
         case .available: return .green
-        case .locked:    return .orange
+        case .locked: return .orange
         }
     }
     private var systemImage: String {
         switch state {
         case .available: return "checkmark.circle.fill"
-        case .locked:    return "lock.fill"
+        case .locked: return "lock.fill"
         }
     }
 
@@ -77,7 +74,6 @@ private struct StatusBadge: View {
                                    .easeInOut(duration: 1.2).repeatForever(autoreverses: true) : .default,
                                    value: pulse)
                 )
-
             Image(systemName: systemImage)
                 .resizable()
                 .scaledToFit()
@@ -92,17 +88,13 @@ private struct StatusBadge: View {
     }
 }
 
-// MARK: - Vista principal
 struct TurnoRapidoAdminView: View {
     @EnvironmentObject private var router: EmpleadoRouter
     @Binding var loggedIn: Bool
-
     let idempleado: Int
     let permisos: String
     let api: any AdminAPI
-
     private let service = ServicioTurnoAdmin()
-
     @State private var turnoId: Int? = nil
     @State private var ventanillaId: Int? = nil
     @State private var cargando = false
@@ -118,7 +110,7 @@ struct TurnoRapidoAdminView: View {
     private var tituloEstado: String {
         switch visualState {
         case .available: return "Disponible"
-        case .locked:    return "No disponible"
+        case .locked: return "No disponible"
         }
     }
 
@@ -128,7 +120,6 @@ struct TurnoRapidoAdminView: View {
     private var puedeFinalizar: Bool { (turnoId != nil) && !cargando }
     private var botonColor: Color { isLocked ? .orange : AdminColors.marca }
 
-    // MARK: - Enum para ambas alertas
     enum ActiveAlert: Identifiable {
         case salir
         case error(String)
@@ -145,19 +136,14 @@ struct TurnoRapidoAdminView: View {
         NavigationStack {
             ZStack {
                 Color(.systemGray6).ignoresSafeArea()
-
                 VStack(spacing: 26) {
                     Spacer(minLength: 10)
-
-                    // Info útil para depurar sesión (idempleado/permisos)
                     HStack(spacing: 12) {
                         Label("ID: \(idempleado)", systemImage: "person.crop.circle")
                         Label(permisos, systemImage: "key.fill")
                     }
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-
-                    // Chip de ventanilla o CTA para configurarla
                     if let v = ventanillaId ?? loadVentanillaFromSnapshot().vent {
                         VentChip(text: "Ventanilla \(v)")
                     } else {
@@ -171,15 +157,10 @@ struct TurnoRapidoAdminView: View {
                                 .foregroundStyle(Color.orange)
                         }
                     }
-
                     StatusBadge(state: visualState)
-
-                    // Título
                     Text(tituloEstado)
                         .font(.system(size: 44, weight: .bold, design: .rounded))
                         .foregroundStyle(.primary)
-
-                    // Botón principal
                     Button { Task { await toggleTurno() } } label: {
                         Text(turnoId == nil ? "Empezar turno" : "Finalizar turno")
                             .font(.system(size: 30, weight: .bold, design: .rounded))
@@ -191,8 +172,6 @@ struct TurnoRapidoAdminView: View {
                     }
                     .disabled(cargando || (turnoId == nil && !puedeEmpezar))
                     .opacity(cargando ? 0.6 : 1)
-
-                    // Botón manual
                     Button {
                         onPressFinish()
                     } label: {
@@ -205,8 +184,6 @@ struct TurnoRapidoAdminView: View {
                     }
                     .disabled(cargando || (ventanillaId ?? loadVentanillaFromSnapshot().vent) == nil)
                     .sheet(isPresented: $showFinishSheet) { finishSheet }
-
-                    // Subtexto
                     Group {
                         if let v = ventanillaId ?? loadVentanillaFromSnapshot().vent {
                             if let t = turnoId {
@@ -222,8 +199,6 @@ struct TurnoRapidoAdminView: View {
                     }
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(.secondary)
-
-                    // Botón de cerrar sesión
                     HStack {
                         Button(action: { activeAlert = .salir }) {
                             Image(systemName: "rectangle.portrait.and.arrow.forward.fill")
@@ -232,9 +207,7 @@ struct TurnoRapidoAdminView: View {
                                 .padding()
                         }
                     }
-
                     if cargando { ProgressView().scaleEffect(1.4) }
-
                     Spacer(minLength: 40)
                 }
                 .padding(.horizontal, 60)
@@ -242,7 +215,6 @@ struct TurnoRapidoAdminView: View {
             .navigationTitle("Turno rápido")
             .navigationBarTitleDisplayMode(.inline)
             .tint(AdminColors.marca)
-            // 🔔 ALERTA UNIFICADA
             .alert(item: $activeAlert) { alert in
                 switch alert {
                 case .salir:
@@ -254,7 +226,6 @@ struct TurnoRapidoAdminView: View {
                         },
                         secondaryButton: .cancel()
                     )
-
                 case .error(let message):
                     return Alert(
                         title: Text("Aviso"),
@@ -282,7 +253,6 @@ struct TurnoRapidoAdminView: View {
         }
     }
 
-    // MARK: - Sheet de finish manual
     private var finishSheet: some View {
         NavigationView {
             VStack(spacing: 18) {
@@ -291,12 +261,10 @@ struct TurnoRapidoAdminView: View {
                 Text("Si el turno quedó atorado en el servidor, ingresa el **turno_id** para liberar la ventanilla.")
                     .font(.subheadline).foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-
                 TextField("turno_id", text: $finishTurnoIdText)
                     .keyboardType(.numberPad)
                     .textFieldStyle(.roundedBorder)
                     .padding(.horizontal)
-
                 Button {
                     Task { await finishManual() }
                 } label: {
@@ -308,7 +276,6 @@ struct TurnoRapidoAdminView: View {
                         .foregroundStyle(.white)
                 }
                 .padding(.horizontal)
-
                 Spacer()
             }
             .padding()
@@ -318,7 +285,6 @@ struct TurnoRapidoAdminView: View {
         }
     }
 
-    // MARK: - Acciones
     private func toggleTurno() async {
         do {
             cargando = true
@@ -385,9 +351,7 @@ struct TurnoRapidoAdminView: View {
         let msg: String = (e.domain == "HTTP")
             ? "HTTP \(e.code): \((e.userInfo["body"] as? String) ?? "")"
             : e.localizedDescription
-
         activeAlert = .error(msg)
-
         if msg.localizedCaseInsensitiveContains("no está disponible")
             || msg.localizedCaseInsensitiveContains("not available") {
             withAnimation(.spring()) { lockedByBackend = true }

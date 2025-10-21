@@ -27,7 +27,6 @@ struct HistorialAdminView: View {
                 }
                 .padding(.horizontal, 20)
                 
-                // Card de Filtros
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Filtros").font(.headline)
                     VStack(alignment: .leading, spacing: 12) {
@@ -58,7 +57,6 @@ struct HistorialAdminView: View {
                 .onChange(of: ventanillaSeleccionada) { _, _ in Task { await cargarDatos() } }
                 .onChange(of: fechaSeleccionada) { _, _ in Task { await cargarDatos() } }
                 
-                // Card de Resultados
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Resultados (\(historial.count))").font(.headline)
                     
@@ -106,7 +104,7 @@ struct HistorialAdminView: View {
     
     func cargarDatos() async {
         isLoading = true
-        defer { isLoading = false } // para asegurar que se apague el loading siempre
+        defer { isLoading = false } /
         
         guard let ventId = ventanillaSeleccionada else {
             historial = []
@@ -126,12 +124,10 @@ struct HistorialAdminView: View {
         do {
             ventanillas = try await fetchAllVentanillas()
             
-            // Selecciona automáticamente la primera ventanilla si no hay una elegida
             if ventanillaSeleccionada == nil, let primera = ventanillas.first {
                 ventanillaSeleccionada = primera.Id
             }
             
-            // Carga el historial de esa ventanilla
             if let ventId = ventanillaSeleccionada {
                 historial = try await fetchHistorial(fecha: fechaSeleccionada, ventanillaId: ventId)
             }

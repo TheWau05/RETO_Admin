@@ -8,7 +8,6 @@ extension Array where Element == Double {
     }
 }
 
-// MARK: - Vista principal
 struct EstadisticaVentanillaView: View {
     @State private var turnos: [Turnos24ComparisonItem] = []
     @State private var turnosAvg: [Turno24AverageHour] = []
@@ -18,31 +17,26 @@ struct EstadisticaVentanillaView: View {
     @State private var empleadoAvgTimes: [EmpAvgTimes] = []
     
     
-    @EnvironmentObject var store: CitasStore   // Para render en canvas
+    @EnvironmentObject var store: CitasStore
     
-    // Total de turnos futuros (ahead)
     private var upcomingTurnosCount: Int {
         turnos.filter { $0.period.lowercased() == "future" }
               .map(\.turnosCount)
               .reduce(0, +)
     }
     
-    // Ventanillas abiertas
     private var ventanillasAvailableCount: Int {
         ventanillasAvailable.filter { $0.disponible }.count
     }
     
-    // Tiempo peomedio por atención en ventanilla
     private var avgService: Double {
         turnosAvg.compactMap { $0.avgServiceMinutes }.averageRounded
     }
     
-    // Tiempo promedio por espera a ventanilla
     private var avgWait: Double {
         turnosAvg.compactMap { $0.avgWaitMinutes }.averageRounded
     }
     
-    // Helper for Turnos Count graph
     private var binnedTurnos: [TurnosComparisonBin] {
         turnos.map { item in
             let hour = Calendar.current.component(.hour, from: item.hourStart)
@@ -52,8 +46,7 @@ struct EstadisticaVentanillaView: View {
         }
     }
     
-    // Helper for Service and Wait Times Graph
-    private var binnedAverages: [TurnosAverageBin] {
+z    private var binnedAverages: [TurnosAverageBin] {
         turnosAvg.flatMap { item in
             let hour = Calendar.current.component(.hour, from: item.hourStart)
             return [
@@ -72,7 +65,6 @@ struct EstadisticaVentanillaView: View {
         ScrollView {
             VStack(spacing: 20) {
                 
-                // Tarjetas superiores
                 HStack(spacing: 12) {
                     StatCard(title: "Turnos Próximos",
                              value: upcomingTurnosCount,
@@ -81,7 +73,6 @@ struct EstadisticaVentanillaView: View {
                              value: ventanillasAvailableCount,
                              color: .orange)
                 }
-                // Tarketas inferiores
                 HStack(spacing: 12) {
                     StatCard(title: "Duración servicio promedio (min)",
                              value: Int(avgService),
@@ -94,7 +85,6 @@ struct EstadisticaVentanillaView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 10)
             
-            // Turnos Count Graph
             VStack(alignment: .leading, spacing: 8) {
                 Text("Turnos por Hora (Pasado vs Futuro)")
                     .font(.title2)
@@ -140,7 +130,6 @@ struct EstadisticaVentanillaView: View {
             .frame(height: 300)
             .padding(.horizontal, 10)
         
-            // Service and Wait Times Graph
             VStack(alignment: .leading, spacing: 8) {
                 Text("Duración Promedio de Espera vs Servicio")
                     .font(.title2)
@@ -186,10 +175,8 @@ struct EstadisticaVentanillaView: View {
                 .frame(height: 300)
                 .padding(.horizontal, 10)
                 
-                // Tables for ventanillas and employees times
                 HStack {
                     Spacer()
-                    // Visual-only (sin API)
                     TablesBlock()
                         .frame(maxWidth: 980)
                     Spacer()
@@ -218,14 +205,6 @@ struct EstadisticaVentanillaView: View {
                 print("Error fetching data:", error)
             }
         }
-    }
-}
-
-// MARK: - Preview
-#Preview {
-    NavigationStack {
-        EstadisticaVentanillaView()
-            .environmentObject(CitasStore()) // Para render en canvas
     }
 }
 

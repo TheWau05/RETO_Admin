@@ -13,7 +13,6 @@ enum AdminRoute: Hashable { case detalleHistorial(id: String) }
 final class AdminRouter: ObservableObject {
     @Published var selected: AdminTab = .abrirCerrar
 
-    // Paths existentes
     @Published var abrirCerrarPath = NavigationPath()
     @Published var dashboardPath = NavigationPath()
     @Published var historialPath = NavigationPath()

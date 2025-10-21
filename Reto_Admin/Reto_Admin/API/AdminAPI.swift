@@ -7,9 +7,7 @@
 
 import Foundation
 
-// MARK: - Contrato
 protocol AdminAPI {
-    // Stats / tablas (NO usados por Abrir/Cerrar; dejar para que compile el resto)
     func avgTimesByEmployee() async throws -> [EmployeeAvg]
     func avgTimesByVentanilla() async throws -> [VentanillaAvg]
     func turnos24hAverages() async throws -> [TurnoAverageHour]
@@ -18,21 +16,17 @@ protocol AdminAPI {
     func createEmergencyTurno(username: String) async throws -> String
 
 
-    // Turnos (NO usados por Abrir/Cerrar)
     func aheadCount(turnoId: Int) async throws -> AheadCount
     func getNextTurno() async throws -> NextTurno
     func userTurns(userId: Int) async throws -> [UserTurn]
 
-    // Ventanillas / Servicio (SÍ usamos open/close)
     func openVentanilla(ventanillaId: Int, empId: Int) async throws
     func closeVentanilla(ventanillaId: Int) async throws
     func serviceVentanilla(ventanillaId: Int, empId: Int) async throws
     func startService(ventanillaId: Int, turnoId: Int) async throws
 
-    // Compat de UI antigua (lo dejo pero con default que llama open/close)
     func setVentanillaState(ventanillaId: Int, hourStart: Date, closed: Bool) async throws
 
-    // Empleados (SÍ usamos)
     func unassignedEmployees() async throws -> [EmployeeBasic]
 }
 
@@ -43,7 +37,6 @@ enum APIError: Error {
     case unimplemented
 }
 
-// MARK: - Defaults para TODO lo que no usa Abrir/Cerrar
 extension AdminAPI {
     func avgTimesByEmployee() async throws -> [EmployeeAvg] { throw APIError.unimplemented }
     func avgTimesByVentanilla() async throws -> [VentanillaAvg] { throw APIError.unimplemented }
@@ -60,30 +53,24 @@ extension AdminAPI {
     func serviceVentanilla(ventanillaId: Int, empId: Int) async throws { throw APIError.unimplemented }
     func startService(ventanillaId: Int, turnoId: Int) async throws { throw APIError.unimplemented }
 
-    // Default útil: si alguien aún llama esto, lo mapeo a open/close con empId=1
     func setVentanillaState(ventanillaId: Int, hourStart: Date, closed: Bool) async throws {
         if closed { try await closeVentanilla(ventanillaId: ventanillaId) }
         else { try await openVentanilla(ventanillaId: ventanillaId, empId: 1) }
     }
 
-    // Si nadie lo implementa: por claridad fallar explícito
     func unassignedEmployees() async throws -> [EmployeeBasic] { throw APIError.unimplemented }
 }
 
-// MARK: - Forzar Turno de Emergencia
 extension HTTPAdminAPI {
     func createEmergencyTurno(username: String) async throws -> String {
-        // Endpoint completo
         let url = baseURL.appendingPathComponent("turnos/emergency")
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.addValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        // Body JSON
         let body: [String: String] = ["username": username]
         req.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
 
-        // Petición
         let (data, resp) = try await session.data(for: req)
         guard let http = resp as? HTTPURLResponse else {
             throw APIError.requestFailed(-1)
@@ -96,7 +83,6 @@ extension HTTPAdminAPI {
             ])
         }
 
-        // Parseo del resultado como texto legible
         if let obj = try? JSONSerialization.jsonObject(with: data, options: []),
            let pretty = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted]),
            let str = String(data: pretty, encoding: .utf8) {
@@ -110,10 +96,9 @@ extension HTTPAdminAPI {
 }
 
 
-// MARK: - Cliente HTTP SOLO Abrir/Cerrar
 final class HTTPAdminAPI: AdminAPI {
     struct Paths {
-        let prefix = "" // cambia a "/api" si tu Flask tiene prefijo
+        let prefix = ""
         func open(_ v: Int, _ e: Int) -> String { "\(prefix)/ventanillas/open/\(v)/\(e)" }
         func close(_ v: Int)             -> String { "\(prefix)/ventanillas/close/\(v)" }
         var unassigned: String           { "\(prefix)/employees/unassigned" }
@@ -128,12 +113,10 @@ final class HTTPAdminAPI: AdminAPI {
         self.session = session
     }
 
-    // Empleados
     func unassignedEmployees() async throws -> [EmployeeBasic] {
         try await getWrapped(paths.unassigned)
     }
 
-    // Ventanillas
     func openVentanilla(ventanillaId: Int, empId: Int) async throws {
         try await postVoid(paths.open(ventanillaId, empId))
     }
@@ -141,7 +124,6 @@ final class HTTPAdminAPI: AdminAPI {
         try await postVoid(paths.close(ventanillaId))
     }
 
-    // Infra mínima
     private struct EmptyBody: Encodable {}
     private func decodeWrapped<T: Decodable>(_ data: Data) throws -> T {
         let dec = JSONDecoder.api
@@ -175,7 +157,6 @@ final class HTTPAdminAPI: AdminAPI {
     }
 }
 
-// MARK: - FORMATTER GLOBAL RFC1123 (para todas las fechas de Flask)
 let Olirfc1123Formatter: DateFormatter = {
     let formatter = DateFormatter()
     formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -186,12 +167,10 @@ let Olirfc1123Formatter: DateFormatter = {
 
 func OlilocalDate(from dateString: String) -> Date {
     guard let parsed = Olirfc1123Formatter.date(from: dateString) else { return Date() }
-    // Flask marca “GMT” pero envía hora local → compensamos +offset
     let offset = TimeZone.current.secondsFromGMT()
     return parsed.addingTimeInterval(TimeInterval(offset))
 }
 
-// MARK: - Modelos y llamadas personalizadas
 
 struct HistorialUs: Codable, Identifiable {
     let id = UUID()
@@ -243,7 +222,6 @@ func fetchAllVentanillas() async throws -> [NumVentanilla] {
     return try JSONDecoder().decode([NumVentanilla].self, from: data)
 }
 
-// MARK: - Reporte de Desempeño
 
 struct Empleado: Codable, Identifiable, Hashable {
     let Id: Int

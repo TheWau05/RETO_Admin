@@ -9,7 +9,6 @@ import SwiftUI
 
 struct RendimientoEmpleadoView: View {
     
-    // Variables
     @State private var empleadoSeleccionado: Int?
     @State private var fechaInicio = Date()
     @State private var fechaFin = Date()
@@ -19,13 +18,11 @@ struct RendimientoEmpleadoView: View {
     @State private var isLoading = false
     @State private var hasSearched = false
     
-    // Body
     var body: some View {
         ZStack {
             Color(.systemGray6).ignoresSafeArea()
             
             VStack(alignment: .leading, spacing: 20) {
-                // 1. Encabezado de la Página
                 PageHeader(title: "Reporte de Desempeño") {
                     Image(systemName: "chart.bar.xaxis")
                         .font(.system(size: 28, weight: .semibold))
@@ -33,19 +30,15 @@ struct RendimientoEmpleadoView: View {
                 }
                 .padding(.horizontal, 20)
                 
-                // 2. Card de Filtros
                 filtrosCard
                 
-                // 3. Resultados
                 if isLoading {
                     ProgressView("Generando reporte...")
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.top, 50)
                 } else if let reporte = reporte {
-                    // Si tenemos un reporte, mostramos los resultados
                     resultadosView(reporte: reporte)
                 } else {
-                    // Estado inicial o sin resultados después de una búsqueda
                     estadoVacio
                 }
                 
@@ -55,7 +48,6 @@ struct RendimientoEmpleadoView: View {
         .navBarStyleGray()
         .tint(AdminColors.marca)
         .task {
-            // Carga la lista de empleados cuando la vista aparece por primera vez
             await cargarEmpleados()
         }
     }
@@ -64,7 +56,6 @@ struct RendimientoEmpleadoView: View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Filtros de Búsqueda").font(.headline)
             
-            // Selector de Empleado
             Picker("Empleado", selection: $empleadoSeleccionado) {
                 Text("Seleccionar un empleado").tag(Int?.none)
                 ForEach(empleados) { empleado in
@@ -76,13 +67,11 @@ struct RendimientoEmpleadoView: View {
             .background(RoundedRectangle(cornerRadius: 8).fill(Color(.systemGray5)))
 
             
-            // Selectores de Fecha
             HStack {
                 DatePicker("Desde", selection: $fechaInicio, displayedComponents: .date)
                 DatePicker("Hasta", selection: $fechaFin, displayedComponents: .date)
             }
             
-            // Botón para generar el reporte
             Button(action: {
                 Task {
                     await generarReporte()
@@ -113,7 +102,6 @@ struct RendimientoEmpleadoView: View {
         }
         .padding(.horizontal, 20)
         
-        // Lista de Detalles
         List {
 //            Section(header: Text("Historial de Servicio Detallado").font(.headline)) {
 //                if reporte.details.isEmpty {
@@ -201,14 +189,13 @@ struct RendimientoEmpleadoView: View {
         .padding(.vertical, 8)
     }
     
-    // API Calls
     
     func generarReporte() async {
         guard let empleadoId = empleadoSeleccionado else { return }
         
         isLoading = true
         hasSearched = true
-        reporte = nil // Limpiamos el reporte anterior
+        reporte = nil
         
         do {
             self.reporte = try await fetchPerformanceReport(
@@ -218,7 +205,6 @@ struct RendimientoEmpleadoView: View {
             )
         } catch {
             print("Error al generar el reporte: \(error)")
-            // El reporte ya es nil, así que se mostrará el mensaje de "No se encontraron resultados"
         }
         
         isLoading = false
@@ -235,7 +221,6 @@ struct RendimientoEmpleadoView: View {
 }
 
 
-// Preview
 
 #if DEBUG
 struct RendimientoEmpleadoView_Previews: PreviewProvider {

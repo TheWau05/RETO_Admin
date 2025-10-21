@@ -1,12 +1,10 @@
 import SwiftUI
 
 struct LoginAdminView: View {
-    // Bindings requeridos
     @Binding var loggedIn: Bool
     @Binding var idempleado: Int
     @Binding var permisos: String
 
-    // Estado local
     @State private var usuario: String = ""
     @State private var contrasena: String = ""
     @State private var showAlert: Bool = false
