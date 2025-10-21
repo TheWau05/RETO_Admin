@@ -23,7 +23,7 @@ struct EmpleadoTabView: View {
                 // ✅ Usuario dentro del sistema
                 TabView(selection: $router.selected) {
                     NavigationStack(path: $router.togglePath) {
-                        TurnoRapidoAdminView(idempleado: idempleado, permisos: permisos, api: apiContainer.client)
+                        TurnoRapidoAdminView(loggedIn: $loggedIn,idempleado: idempleado, permisos: permisos, api: apiContainer.client)
                     }
                     .tabItem { Label("Toggle", systemImage: "switch.2") }
                     .tag(EmpleadoTab.TurnoRapidoAdminView)

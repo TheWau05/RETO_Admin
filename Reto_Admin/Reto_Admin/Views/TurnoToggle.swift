@@ -3,6 +3,8 @@
 //  Reto_Admin
 //
 //  Created by Marco Ramos Jalife on 20/10/25.
+//
+
 import SwiftUI
 import AVFoundation
 
@@ -93,24 +95,22 @@ private struct StatusBadge: View {
 // MARK: - Vista principal
 struct TurnoRapidoAdminView: View {
     @EnvironmentObject private var router: EmpleadoRouter
-    @State private var activeAlert: ActiveAlert?
-
+    @Binding var loggedIn: Bool
 
     let idempleado: Int
     let permisos: String
     let api: any AdminAPI
 
-    
     private let service = ServicioTurnoAdmin()
 
     @State private var turnoId: Int? = nil
     @State private var ventanillaId: Int? = nil
-
     @State private var cargando = false
-    @State private var errorMsg: String? = nil
     @State private var lockedByBackend = false
     @State private var showFinishSheet = false
     @State private var finishTurnoIdText = ""
+    @State private var errorMsg: String? = nil
+    @State private var activeAlert: ActiveAlert?
 
     private var isLocked: Bool { (turnoId != nil) || lockedByBackend }
     private var visualState: VisualState { isLocked ? .locked : .available }
@@ -121,22 +121,26 @@ struct TurnoRapidoAdminView: View {
         case .locked:    return "No disponible"
         }
     }
+
     private var puedeEmpezar: Bool {
         return !isLocked && !cargando && (ventanillaId ?? loadVentanillaFromSnapshot().vent) != nil
     }
     private var puedeFinalizar: Bool { (turnoId != nil) && !cargando }
     private var botonColor: Color { isLocked ? .orange : AdminColors.marca }
-    
+
+    // MARK: - Enum para ambas alertas
     enum ActiveAlert: Identifiable {
         case salir
-        
+        case error(String)
+
         var id: String {
             switch self {
             case .salir: return "salir"
+            case .error(let msg): return "error-\(msg)"
             }
         }
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -144,14 +148,6 @@ struct TurnoRapidoAdminView: View {
 
                 VStack(spacing: 26) {
                     Spacer(minLength: 10)
-                    Button(action: { activeAlert = .salir }) {
-                        Image(systemName: "rectangle.portrait.and.arrow.forward.fill")
-                            .font(.system(size: 26, weight: .semibold))
-                            .foregroundColor(.red)
-                            .padding(.trailing, 24)
-                            .padding(.top, 12)
-                    }
-                
 
                     // Info útil para depurar sesión (idempleado/permisos)
                     HStack(spacing: 12) {
@@ -183,7 +179,7 @@ struct TurnoRapidoAdminView: View {
                         .font(.system(size: 44, weight: .bold, design: .rounded))
                         .foregroundStyle(.primary)
 
-                    // Botón principal: Empezar / Finalizar según haya turno activo
+                    // Botón principal
                     Button { Task { await toggleTurno() } } label: {
                         Text(turnoId == nil ? "Empezar turno" : "Finalizar turno")
                             .font(.system(size: 30, weight: .bold, design: .rounded))
@@ -196,7 +192,7 @@ struct TurnoRapidoAdminView: View {
                     .disabled(cargando || (turnoId == nil && !puedeEmpezar))
                     .opacity(cargando ? 0.6 : 1)
 
-                    // Botón explícito para liberar manual (si se atora)
+                    // Botón manual
                     Button {
                         onPressFinish()
                     } label: {
@@ -227,6 +223,16 @@ struct TurnoRapidoAdminView: View {
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(.secondary)
 
+                    // Botón de cerrar sesión
+                    HStack {
+                        Button(action: { activeAlert = .salir }) {
+                            Image(systemName: "rectangle.portrait.and.arrow.forward.fill")
+                                .font(.system(size: 26, weight: .semibold))
+                                .foregroundColor(.red)
+                                .padding()
+                        }
+                    }
+
                     if cargando { ProgressView().scaleEffect(1.4) }
 
                     Spacer(minLength: 40)
@@ -236,11 +242,30 @@ struct TurnoRapidoAdminView: View {
             .navigationTitle("Turno rápido")
             .navigationBarTitleDisplayMode(.inline)
             .tint(AdminColors.marca)
-            .alert("Aviso", isPresented: .constant(errorMsg != nil)) {
-                Button("OK") { errorMsg = nil }
-            } message: { Text(errorMsg ?? "") }
+            // 🔔 ALERTA UNIFICADA
+            .alert(item: $activeAlert) { alert in
+                switch alert {
+                case .salir:
+                    return Alert(
+                        title: Text("Cerrar sesión"),
+                        message: Text("¿Seguro que deseas cerrar sesión?"),
+                        primaryButton: .destructive(Text("Cerrar sesión")) {
+                            loggedIn = false
+                        },
+                        secondaryButton: .cancel()
+                    )
+
+                case .error(let message):
+                    return Alert(
+                        title: Text("Aviso"),
+                        message: Text(message),
+                        dismissButton: .default(Text("OK")) {
+                            errorMsg = nil
+                        }
+                    )
+                }
+            }
             .task {
-                // 1) Carga cache si había turno activo → candado
                 let cache = service.loadCached()
                 if let tid = cache.turno, let vid = cache.ventanilla {
                     withAnimation(.spring()) {
@@ -249,7 +274,6 @@ struct TurnoRapidoAdminView: View {
                         self.lockedByBackend = false
                     }
                 } else {
-                    // 2) Usa la ventanilla del snapshot
                     let ctx = loadVentanillaFromSnapshot()
                     self.ventanillaId = ctx.vent
                     self.lockedByBackend = false
@@ -299,16 +323,14 @@ struct TurnoRapidoAdminView: View {
         do {
             cargando = true
             if let tid = turnoId, let vid = ventanillaId {
-                // FINISH → candado -> check
                 try await service.finishService(turnoId: tid, ventanillaId: vid)
                 service.clearCached()
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
-                    turnoId = nil           // disponible
+                    turnoId = nil
                     lockedByBackend = false
                 }
                 UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
             } else {
-                // START → check -> candado
                 let a = try await service.startService()
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
                     turnoId = a.turnoId
@@ -352,7 +374,7 @@ struct TurnoRapidoAdminView: View {
     private func finishManual() async {
         guard let vid = ventanillaId ?? loadVentanillaFromSnapshot().vent,
               let tid = Int(finishTurnoIdText.trimmingCharacters(in: .whitespaces)) else {
-            errorMsg = "Ingresa un turno_id válido."
+            activeAlert = .error("Ingresa un turno_id válido.")
             return
         }
         showFinishSheet = false
@@ -363,7 +385,8 @@ struct TurnoRapidoAdminView: View {
         let msg: String = (e.domain == "HTTP")
             ? "HTTP \(e.code): \((e.userInfo["body"] as? String) ?? "")"
             : e.localizedDescription
-        errorMsg = msg
+
+        activeAlert = .error(msg)
 
         if msg.localizedCaseInsensitiveContains("no está disponible")
             || msg.localizedCaseInsensitiveContains("not available") {
