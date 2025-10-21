@@ -8,18 +8,16 @@
 import SwiftUI
 
 struct RendimientoEmpleadoView: View {
-    // State Variables
     
-    // Filtros
+    // Variables
     @State private var empleadoSeleccionado: Int?
     @State private var fechaInicio = Date()
     @State private var fechaFin = Date()
     
-    // Datos y Control de UI
-    @State private var empleados: [Empleado] = [] // Para poblar el Picker
+    @State private var empleados: [Empleado] = []
     @State private var reporte: PerformanceReport?
     @State private var isLoading = false
-    @State private var hasSearched = false // Para saber si ya se hizo una búsqueda
+    @State private var hasSearched = false
     
     // Body
     var body: some View {
@@ -31,7 +29,7 @@ struct RendimientoEmpleadoView: View {
                 PageHeader(title: "Reporte de Desempeño") {
                     Image(systemName: "chart.bar.xaxis")
                         .font(.system(size: 28, weight: .semibold))
-                        .foregroundStyle(AdminColors.acento) // Asegúrate de tener tus colores definidos
+                        .foregroundStyle(AdminColors.acento)
                 }
                 .padding(.horizontal, 20)
                 
@@ -54,25 +52,23 @@ struct RendimientoEmpleadoView: View {
                 Spacer()
             }
         }
-        .navBarStyleGray() // Asegúrate de tener este modifier
+        .navBarStyleGray()
         .tint(AdminColors.marca)
         .task {
             // Carga la lista de empleados cuando la vista aparece por primera vez
             await cargarEmpleados()
         }
     }
-    
-    // Subviews (Componentes de la Vista)
-    
+        
     private var filtrosCard: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Filtros de Búsqueda").font(.headline)
             
             // Selector de Empleado
             Picker("Empleado", selection: $empleadoSeleccionado) {
-                Text("Seleccionar un empleado").tag(Int?.none) // Opción por defecto
+                Text("Seleccionar un empleado").tag(Int?.none)
                 ForEach(empleados) { empleado in
-                    Text(empleado.Name).tag(empleado.Id as Int?)
+                    Text(empleado.fullName).tag(empleado.Id as Int?)
                 }
             }
             .pickerStyle(.menu)
@@ -130,7 +126,7 @@ struct RendimientoEmpleadoView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .scrollContentBackground(.hidden) // Para que el fondo gris se vea
+        .scrollContentBackground(.hidden)
     }
     
     private var estadoVacio: some View {
@@ -171,10 +167,9 @@ struct RendimientoEmpleadoView: View {
     private func turnoRow(detalle: PerformanceDetail) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Turno #\(detalle.TurnoId)")
+                Text("Turno \(detalle.TurnoId)")
                     .fontWeight(.bold)
-                // Idealmente, aquí convertirías el String a una fecha y la formatearías
-                Text(detalle.Start_Time)
+                Text(formattedDate(from: detalle.Start_Time))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -183,7 +178,7 @@ struct RendimientoEmpleadoView: View {
                 Text("\(detalle.Duracion_Minutos) min")
                     .fontWeight(.semibold)
                     .foregroundStyle(AdminColors.acento)
-                Text("Ventanilla #\(detalle.Ventanilla_Id)")
+                Text("Ventanilla \(detalle.Ventanilla_Id)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -201,7 +196,6 @@ struct RendimientoEmpleadoView: View {
         reporte = nil // Limpiamos el reporte anterior
         
         do {
-            // --- REEMPLAZAR ESTO CON LA LLAMADA REAL ---
             self.reporte = try await fetchPerformanceReport(
                 employeeId: empleadoId,
                 startDate: fechaInicio,
@@ -216,25 +210,17 @@ struct RendimientoEmpleadoView: View {
     }
     
     func cargarEmpleados() async {
-        // --- REEMPLAZAR ESTO CON LA LLAMADA REAL A TU ENDPOINT DE EMPLEADOS ---
         do {
-            // Ejemplo: self.empleados = try await fetchAllEmployees()
-            
-            // Datos de ejemplo para el diseño:
-            self.empleados = [
-                Empleado(Id: 1, Name: "Carlos Ramírez"),
-                Empleado(Id: 2, Name: "Ana Martínez"),
-                Empleado(Id: 3, Name: "Luis Gómez")
-            ]
+            self.empleados = try await fetchAllEmployees()
         } catch {
             print("Error al cargar empleados: \(error)")
-            // Manejar el error, por ejemplo mostrando una alerta
         }
     }
+
 }
 
 
-// MARK: - Preview
+// Preview
 
 #if DEBUG
 struct RendimientoEmpleadoView_Previews: PreviewProvider {

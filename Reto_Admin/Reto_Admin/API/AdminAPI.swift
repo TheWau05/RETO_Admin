@@ -144,6 +144,15 @@ struct HistorialUs: Codable, Identifiable {
     }
 }
 
+struct NumVentanilla: Codable, Identifiable, Hashable {
+    let Id: Int
+    let Disponible: Bool
+    let Emp_Id: Int?
+    let Estatus: String
+    
+    var id: Int { Id }
+}
+
 func fetchHistorial(fecha: Date, ventanillaId: Int) async throws -> [HistorialUs] {
     // 1. Convertimos la fecha de Swift a un String en formato YYYY-MM-DD para la URL
     let urlDateFormatter = DateFormatter()
@@ -168,18 +177,37 @@ func fetchHistorial(fecha: Date, ventanillaId: Int) async throws -> [HistorialUs
     return try decoder.decode([HistorialUs].self, from: data)
 }
 
+func fetchAllVentanillas() async throws -> [NumVentanilla] {
+    guard let url = URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206/ventanillas") else {
+        throw URLError(.badURL)
+    }
+    
+    let (data, response) = try await URLSession.shared.data(from: url)
+    guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+        throw URLError(.badServerResponse)
+    }
+    
+    let decoder = JSONDecoder()
+    return try decoder.decode([NumVentanilla].self, from: data)
+}
+
+
 // Reporte de Desempeño
 
 // Para la lista de empleados que aparecerá en el Picker/Dropdown
-// NOTA: Asegúrate que las propiedades coincidan con el JSON de tu endpoint de empleados.
-// Por ahora, asumimos que se llamarán 'Id' y 'Name'.
 struct Empleado: Codable, Identifiable, Hashable {
     let Id: Int
     let Name: String
-    
-    // Esto es para que Swift sepa cómo identificar cada empleado en una lista
+    let Last_Name1: String
+
+    // Propiedad calculada para mostrar solo nombre + apellido
+    var fullName: String {
+        "\(Name) \(Last_Name1)"
+    }
+
     var id: Int { Id }
 }
+
 
 // Para el resumen (las tarjetas con los totales)
 struct PerformanceSummary: Codable {
@@ -206,7 +234,6 @@ struct PerformanceReport: Codable {
 }
 
 // Función para la Pantalla de Rendimiento
-
 func fetchPerformanceReport(employeeId: Int, startDate: Date, endDate: Date) async throws -> PerformanceReport {
     // 1. Convertimos las fechas de Swift a un String en formato YYYY-MM-DD para la URL
     let urlDateFormatter = DateFormatter()
@@ -229,8 +256,43 @@ func fetchPerformanceReport(employeeId: Int, startDate: Date, endDate: Date) asy
     }
     
     // 4. Decodificamos el JSON en nuestro objeto PerformanceReport
-    // No necesitamos un formateador de fecha especial porque los recibimos como String
     let decoder = JSONDecoder()
     return try decoder.decode(PerformanceReport.self, from: data)
 }
 
+// Fución para llamar a los empleados para el Picker
+func fetchAllEmployees() async throws -> [Empleado] {
+    guard let url = URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206/employees") else {
+        throw APIError.badURL
+    }
+
+    let (data, response) = try await URLSession.shared.data(from: url)
+    guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+        throw APIError.requestFailed((response as? HTTPURLResponse)?.statusCode ?? -1)
+    }
+
+    let decoder = JSONDecoder()
+    return try decoder.decode([Empleado].self, from: data)
+}
+
+func formattedDate(from dateString: String) -> String {
+    // 1. Formato que usa tu API
+    let apiFormatter = DateFormatter()
+    apiFormatter.locale = Locale(identifier: "en_US_POSIX")
+    apiFormatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz" // ej. Mon, 20 Oct 2025 15:33:43 GMT
+    apiFormatter.timeZone = TimeZone(secondsFromGMT: 0) // interpretar como UTC
+
+    // 2. Convertimos el string a Date
+    guard let date = apiFormatter.date(from: dateString) else {
+        return dateString
+    }
+
+    // 3. Formateador para mostrar en español local
+    let displayFormatter = DateFormatter()
+    displayFormatter.locale = Locale(identifier: "es_MX")
+    displayFormatter.timeZone = TimeZone.current
+    displayFormatter.dateFormat = "d 'de' MMMM 'de' yyyy, HH:mm"
+
+    // 4. Devolvemos la fecha adaptada al huso horario del dispositivo
+    return displayFormatter.string(from: date)
+}
