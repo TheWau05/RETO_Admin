@@ -131,16 +131,38 @@ final class HTTPAdminAPI: AdminAPI {
     }
 }
 
+// MARK: - FORMATTER GLOBAL RFC1123 (para todas las fechas de Flask)
+let Olirfc1123Formatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+    formatter.timeZone = TimeZone(secondsFromGMT: 0)
+    return formatter
+}()
+
+func OlilocalDate(from dateString: String) -> Date {
+    guard let parsed = Olirfc1123Formatter.date(from: dateString) else { return Date() }
+    // Flask marca “GMT” pero envía hora local → compensamos +offset
+    let offset = TimeZone.current.secondsFromGMT()
+    return parsed.addingTimeInterval(TimeInterval(offset))
+}
+
+// MARK: - Modelos y llamadas personalizadas
+
 struct HistorialUs: Codable, Identifiable {
     let id = UUID()
     let pacienteName: String
     let perscriptionId: String
-    let endTime: Date
+    let endTimeString: String
+
+    var endTime: Date {
+        OlilocalDate(from: endTimeString)
+    }
 
     enum CodingKeys: String, CodingKey {
         case pacienteName = "PacienteName"
         case perscriptionId = "Perscription_Id"
-        case endTime = "End_Time"
+        case endTimeString = "End_Time"
     }
 }
 
@@ -149,150 +171,103 @@ struct NumVentanilla: Codable, Identifiable, Hashable {
     let Disponible: Bool
     let Emp_Id: Int?
     let Estatus: String
-    
     var id: Int { Id }
 }
 
 func fetchHistorial(fecha: Date, ventanillaId: Int) async throws -> [HistorialUs] {
-    // 1. Convertimos la fecha de Swift a un String en formato YYYY-MM-DD para la URL
-    let urlDateFormatter = DateFormatter()
-    urlDateFormatter.dateFormat = "yyyy-MM-dd"
-    let fechaString = urlDateFormatter.string(from: fecha)
-
+    let dateFmt = DateFormatter()
+    dateFmt.dateFormat = "yyyy-MM-dd"
+    let fechaString = dateFmt.string(from: fecha)
     guard let url = URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206/ventanillas/\(ventanillaId)/history?fecha=\(fechaString)") else {
         throw URLError(.badURL)
     }
-    
-    // 2. Hacemos la llamada de red
-    let (data, _) = try await URLSession.shared.data(from: url)
-    
-    // 3. Creamos un decodificador con el formato de fecha que envía la API
-    let decoder = JSONDecoder()
-    let apiDateFormatter = DateFormatter()
-    apiDateFormatter.locale = Locale(identifier: "en_US_POSIX")
-    apiDateFormatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz" // Formato RFC 1123 que usa Flask
-    decoder.dateDecodingStrategy = .formatted(apiDateFormatter)
-    
-    // 4. Decodificamos el JSON en nuestro arreglo de [HistorialUs]
-    return try decoder.decode([HistorialUs].self, from: data)
+    let (data, response) = try await URLSession.shared.data(from: url)
+    guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+        throw URLError(.badServerResponse)
+    }
+    return try JSONDecoder().decode([HistorialUs].self, from: data)
 }
 
 func fetchAllVentanillas() async throws -> [NumVentanilla] {
     guard let url = URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206/ventanillas") else {
         throw URLError(.badURL)
     }
-    
     let (data, response) = try await URLSession.shared.data(from: url)
-    guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+    guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
         throw URLError(.badServerResponse)
     }
-    
-    let decoder = JSONDecoder()
-    return try decoder.decode([NumVentanilla].self, from: data)
+    return try JSONDecoder().decode([NumVentanilla].self, from: data)
 }
 
+// MARK: - Reporte de Desempeño
 
-// Reporte de Desempeño
-
-// Para la lista de empleados que aparecerá en el Picker/Dropdown
 struct Empleado: Codable, Identifiable, Hashable {
     let Id: Int
     let Name: String
     let Last_Name1: String
-
-    // Propiedad calculada para mostrar solo nombre + apellido
-    var fullName: String {
-        "\(Name) \(Last_Name1)"
-    }
-
+    var fullName: String { "\(Name) \(Last_Name1)" }
     var id: Int { Id }
 }
 
-
-// Para el resumen (las tarjetas con los totales)
 struct PerformanceSummary: Codable {
     let TotalTurnosAtendidos: Int
     let TiempoPromedioPorTurno: Int
 }
 
-// Para cada fila en la lista de detalles del historial
 struct PerformanceDetail: Codable, Identifiable {
     let TurnoId: Int
     let Start_Time: String
-    let End_Time: String
-    let Duracion_Minutos: Int
+    let End_Time: String?
+    let Duracion_Minutos: Int?
     let Ventanilla_Id: Int
-    
-    // Hacemos que sea Identifiable para usarlo en un ForEach de SwiftUI
+
+    var startDate: Date { OlilocalDate(from: Start_Time) }
+    var endDate: Date? {
+        guard let end = End_Time else { return nil }
+        return OlilocalDate(from: end)
+    }
+
     var id: Int { TurnoId }
 }
 
-// El objeto completo que agrupa el resumen y los detalles
 struct PerformanceReport: Codable {
     let summary: PerformanceSummary
     let details: [PerformanceDetail]
 }
 
-// Función para la Pantalla de Rendimiento
 func fetchPerformanceReport(employeeId: Int, startDate: Date, endDate: Date) async throws -> PerformanceReport {
-    // 1. Convertimos las fechas de Swift a un String en formato YYYY-MM-DD para la URL
-    let urlDateFormatter = DateFormatter()
-    urlDateFormatter.dateFormat = "yyyy-MM-dd"
-    let startDateString = urlDateFormatter.string(from: startDate)
-    let endDateString = urlDateFormatter.string(from: endDate)
-    
-    // 2. Construimos la URL con los parámetros correctos
-    let urlString = "https://los-cinco-informaticos.tc2007b.tec.mx:10206/employees/\(employeeId)/performance?startDate=\(startDateString)&endDate=\(endDateString)"
-    
-    guard let url = URL(string: urlString) else {
-        throw APIError.badURL // Usamos tu tipo de error personalizado
+    let fmt = DateFormatter()
+    fmt.dateFormat = "yyyy-MM-dd"
+    let startStr = fmt.string(from: startDate)
+    let endStr = fmt.string(from: endDate)
+
+    guard let url = URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206/employees/\(employeeId)/performance?startDate=\(startStr)&endDate=\(endStr)") else {
+        throw APIError.badURL
     }
-    
-    // 3. Hacemos la llamada de red
     let (data, response) = try await URLSession.shared.data(from: url)
-    
-    guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+    guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
         throw APIError.requestFailed((response as? HTTPURLResponse)?.statusCode ?? -1)
     }
-    
-    // 4. Decodificamos el JSON en nuestro objeto PerformanceReport
-    let decoder = JSONDecoder()
-    return try decoder.decode(PerformanceReport.self, from: data)
+    return try JSONDecoder().decode(PerformanceReport.self, from: data)
 }
 
-// Fución para llamar a los empleados para el Picker
 func fetchAllEmployees() async throws -> [Empleado] {
     guard let url = URL(string: "https://los-cinco-informaticos.tc2007b.tec.mx:10206/employees") else {
         throw APIError.badURL
     }
-
     let (data, response) = try await URLSession.shared.data(from: url)
-    guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+    guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
         throw APIError.requestFailed((response as? HTTPURLResponse)?.statusCode ?? -1)
     }
-
-    let decoder = JSONDecoder()
-    return try decoder.decode([Empleado].self, from: data)
+    return try JSONDecoder().decode([Empleado].self, from: data)
 }
 
 func formattedDate(from dateString: String) -> String {
-    // 1. Formato que usa tu API
-    let apiFormatter = DateFormatter()
-    apiFormatter.locale = Locale(identifier: "en_US_POSIX")
-    apiFormatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz" // ej. Mon, 20 Oct 2025 15:33:43 GMT
-    apiFormatter.timeZone = TimeZone(secondsFromGMT: 0) // interpretar como UTC
-
-    // 2. Convertimos el string a Date
-    guard let date = apiFormatter.date(from: dateString) else {
-        return dateString
-    }
-
-    // 3. Formateador para mostrar en español local
-    let displayFormatter = DateFormatter()
-    displayFormatter.locale = Locale(identifier: "es_MX")
-    displayFormatter.timeZone = TimeZone.current
-    displayFormatter.dateFormat = "d 'de' MMMM 'de' yyyy, HH:mm"
-
-    // 4. Devolvemos la fecha adaptada al huso horario del dispositivo
-    return displayFormatter.string(from: date)
+    guard let parsed = Olirfc1123Formatter.date(from: dateString) else { return dateString }
+    let local = OlilocalDate(from: dateString)
+    let display = DateFormatter()
+    display.locale = Locale(identifier: "es_MX")
+    display.timeZone = .current
+    display.dateFormat = "d 'de' MMMM 'de' yyyy, HH:mm"
+    return display.string(from: local)
 }
